@@ -135,11 +135,12 @@ export default function App() {
     const root = feedRef.current
     if (!root) return
 
+    const scroller = root
     let frame = 0
 
     function syncActiveFromScroll() {
       if (scrollingToRef.current === 'all') {
-        if (root.scrollTop > 16) return
+        if (scroller.scrollTop > 16) return
         scrollingToRef.current = null
         return
       }
@@ -147,16 +148,16 @@ export default function App() {
       if (scrollingToRef.current) {
         const target = document.getElementById(`company-${scrollingToRef.current}`)
         if (target) {
-          const offset = target.getBoundingClientRect().top - root.getBoundingClientRect().top
+          const offset = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top
           if (Math.abs(offset) > 64) return
         }
         scrollingToRef.current = null
       }
 
-      const sections = [...root.querySelectorAll<HTMLElement>('[id^="company-"]')]
+      const sections = [...scroller.querySelectorAll<HTMLElement>('[id^="company-"]')]
       if (sections.length === 0) return
 
-      const marker = root.getBoundingClientRect().top + 96
+      const marker = scroller.getBoundingClientRect().top + 96
       let current = sections[0]
       for (const section of sections) {
         if (section.getBoundingClientRect().top <= marker) current = section
@@ -175,9 +176,9 @@ export default function App() {
       })
     }
 
-    root.addEventListener('scroll', onScroll, { passive: true })
+    scroller.addEventListener('scroll', onScroll, { passive: true })
     return () => {
-      root.removeEventListener('scroll', onScroll)
+      scroller.removeEventListener('scroll', onScroll)
       if (frame) window.cancelAnimationFrame(frame)
     }
   }, [campaigns, visibleReviews])
