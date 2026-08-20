@@ -48,7 +48,7 @@ export function ReviewFeed({
               activeId === campaign.id && 'ring-2 ring-ring/60',
             )}
           >
-            <header className="sticky top-0 z-10 -mx-4 -mt-4 mb-4 rounded-[26px] border-b bg-card px-4 pt-4 pb-4">
+            <header className="-mx-4 -mt-4 mb-4 rounded-[26px] border-b px-4 pt-4 pb-4">
               <div className="flex items-start gap-3">
                 {campaign.thumbnail ? (
                   <img
