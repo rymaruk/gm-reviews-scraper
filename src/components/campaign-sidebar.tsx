@@ -1,8 +1,10 @@
-import { MapPinIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { MapPinIcon, PlusIcon, RefreshCwIcon, SearchIcon, Trash2Icon } from 'lucide-react'
 
 import { Stars } from '@/components/stars'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { campaignDisplayName } from '@/lib/place'
 import type { Campaign } from '@/lib/types'
@@ -25,7 +27,17 @@ export function CampaignSidebar({
   onScrape: (campaign: Campaign) => void
   onRemove: (campaign: Campaign) => void
 }) {
+  const [search, setSearch] = useState('')
   const totalReviews = Object.values(reviewCounts).reduce((sum, count) => sum + count, 0)
+  const visibleCampaigns = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return campaigns
+    return campaigns.filter((campaign) => {
+      const name = campaignDisplayName(campaign).toLowerCase()
+      const address = (campaign.address ?? '').toLowerCase()
+      return name.includes(query) || address.includes(query)
+    })
+  }, [campaigns, search])
 
   return (
     <aside className="flex h-full w-80 shrink-0 flex-col border-r bg-sidebar">
@@ -35,6 +47,19 @@ export function CampaignSidebar({
           <PlusIcon />
           Add
         </Button>
+      </div>
+
+      <div className="px-3 pb-3">
+        <div className="relative">
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by name or address"
+            className="pl-8"
+            aria-label="Search companies by name or address"
+          />
+        </div>
       </div>
 
       <div className="px-3 pb-3">
@@ -57,8 +82,12 @@ export function CampaignSidebar({
             <div className="rounded-xl border border-dashed px-3 py-8 text-center text-sm text-muted-foreground">
               Add a Google Maps shop link to start collecting reviews.
             </div>
+          ) : visibleCampaigns.length === 0 ? (
+            <div className="rounded-xl border border-dashed px-3 py-8 text-center text-sm text-muted-foreground">
+              No companies match that search.
+            </div>
           ) : (
-            campaigns.map((campaign) => {
+            visibleCampaigns.map((campaign) => {
               const active = selectedId === campaign.id
               const name = campaignDisplayName(campaign)
               return (
