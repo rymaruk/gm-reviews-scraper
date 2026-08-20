@@ -25,6 +25,9 @@ export async function handleStore(): Promise<ApiResult> {
 }
 
 export async function handleDeleteCampaign(id: string): Promise<ApiResult> {
+  if (!id.trim()) {
+    return { status: 400, body: { error: 'Campaign id is required.' } }
+  }
   try {
     await deleteCampaign(id)
     return { status: 200, body: { ok: true } }
@@ -34,6 +37,9 @@ export async function handleDeleteCampaign(id: string): Promise<ApiResult> {
 }
 
 export async function handlePatchCampaign(id: string, body: unknown): Promise<ApiResult> {
+  if (!id.trim()) {
+    return { status: 400, body: { error: 'Campaign id is required.' } }
+  }
   try {
     const existing = await getCampaign(id)
     if (!existing) {

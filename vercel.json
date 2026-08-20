@@ -17,7 +17,11 @@
       "includeFiles": "{server,src/lib}/**",
       "maxDuration": 60
     },
-    "api/campaigns/[id].ts": {
+    "api/campaigns/remove.ts": {
+      "includeFiles": "{server,src/lib}/**",
+      "maxDuration": 30
+    },
+    "api/campaigns/update.ts": {
       "includeFiles": "{server,src/lib}/**",
       "maxDuration": 30
     }

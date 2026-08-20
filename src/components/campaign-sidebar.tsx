@@ -4,6 +4,14 @@ import { MapPinIcon, PlusIcon, RefreshCwIcon, SearchIcon, Trash2Icon } from 'luc
 import { Stars } from '@/components/stars'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { campaignDisplayName } from '@/lib/place'
@@ -25,9 +33,11 @@ export function CampaignSidebar({
   onSelect: (id: string) => void
   onAdd: () => void
   onScrape: (campaign: Campaign) => void
-  onRemove: (campaign: Campaign) => void
+  onRemove: (campaign: Campaign) => void | Promise<void>
 }) {
   const [search, setSearch] = useState('')
+  const [pendingRemoval, setPendingRemoval] = useState<Campaign | null>(null)
+  const [removing, setRemoving] = useState(false)
   const totalReviews = Object.values(reviewCounts).reduce((sum, count) => sum + count, 0)
   const visibleCampaigns = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -38,6 +48,17 @@ export function CampaignSidebar({
       return name.includes(query) || address.includes(query)
     })
   }, [campaigns, search])
+
+  async function confirmRemove() {
+    if (!pendingRemoval) return
+    setRemoving(true)
+    try {
+      await onRemove(pendingRemoval)
+      setPendingRemoval(null)
+    } finally {
+      setRemoving(false)
+    }
+  }
 
   return (
     <aside className="flex h-full w-80 shrink-0 flex-col border-r bg-sidebar">
@@ -139,7 +160,7 @@ export function CampaignSidebar({
                       type="button"
                       size="icon-sm"
                       variant="ghost"
-                      onClick={() => onRemove(campaign)}
+                      onClick={() => setPendingRemoval(campaign)}
                       aria-label={`Remove ${name}`}
                     >
                       <Trash2Icon />
@@ -151,6 +172,32 @@ export function CampaignSidebar({
           )}
         </div>
       </ScrollArea>
+
+      <Dialog open={pendingRemoval != null} onOpenChange={(open) => !open && !removing && setPendingRemoval(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove this shop?</DialogTitle>
+            <DialogDescription>
+              {pendingRemoval
+                ? `Remove ${campaignDisplayName(pendingRemoval)} and all of its reviews from the database? This cannot be undone.`
+                : 'This cannot be undone.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPendingRemoval(null)}
+              disabled={removing}
+            >
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => void confirmRemove()} disabled={removing}>
+              {removing ? 'Removing…' : 'Remove'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
   )
 }

@@ -60,8 +60,10 @@ export async function fetchReviewsPage(input: {
 }
 
 export async function deleteCampaign(id: string): Promise<void> {
-  const response = await fetch(`/api/campaigns/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
+  const response = await fetch('/api/campaigns/remove', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
   })
   await parseJson(response)
 }
@@ -74,10 +76,10 @@ export async function patchCampaign(
     nextPageToken?: string
   },
 ): Promise<void> {
-  const response = await fetch(`/api/campaigns/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
+  const response = await fetch('/api/campaigns/update', {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(patch),
+    body: JSON.stringify({ id, ...patch }),
   })
   await parseJson(response)
 }

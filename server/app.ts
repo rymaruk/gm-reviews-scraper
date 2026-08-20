@@ -26,6 +26,18 @@ router.get('/store', async (_req, res) => {
   res.status(result.status).json(result.body)
 })
 
+router.post('/campaigns/remove', async (req, res) => {
+  const id = typeof req.body?.id === 'string' ? req.body.id.trim() : ''
+  const result = await handleDeleteCampaign(id)
+  res.status(result.status).json(result.body)
+})
+
+router.post('/campaigns/update', async (req, res) => {
+  const id = typeof req.body?.id === 'string' ? req.body.id.trim() : ''
+  const result = await handlePatchCampaign(id, req.body)
+  res.status(result.status).json(result.body)
+})
+
 router.delete('/campaigns/:id', async (req, res) => {
   const result = await handleDeleteCampaign(String(req.params.id))
   res.status(result.status).json(result.body)
