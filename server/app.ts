@@ -13,7 +13,7 @@ import {
 } from './db.ts'
 import { hasPlaceIdentifier, parseAndExpandMapsUrl } from './maps-url.ts'
 import { fetchReviewsPage, resolveCampaign } from './serpapi.ts'
-import { isSupabaseConfigured } from './supabase.ts'
+import { healthPayload } from './env.ts'
 
 export const app = express()
 
@@ -23,11 +23,7 @@ app.use(express.json({ limit: '1mb' }))
 const router = express.Router()
 
 router.get('/health', (_req, res) => {
-  res.json({
-    ok: true,
-    configured: Boolean(process.env.SERPAPI_KEY),
-    supabase: isSupabaseConfigured(),
-  })
+  res.json(healthPayload())
 })
 
 router.get('/store', async (_req, res) => {

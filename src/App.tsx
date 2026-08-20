@@ -33,7 +33,7 @@ export default function App() {
   const [toDate, setToDate] = useState(initialFilters.toDate)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [configured, setConfigured] = useState(true)
+  const [configError, setConfigError] = useState<string | null>(null)
   const feedRef = useRef<HTMLDivElement>(null)
   const scrolledFromUrl = useRef(false)
 
@@ -48,8 +48,23 @@ export default function App() {
       })
 
     void getHealth()
-      .then((health) => setConfigured(health.configured && health.supabase))
-      .catch(() => setConfigured(false))
+      .then((health) => {
+        if (health.configured && health.supabase) {
+          setConfigError(null)
+          return
+        }
+        const missing = health.missing?.length
+          ? health.missing.join(', ')
+          : 'SERPAPI_KEY, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY'
+        setConfigError(
+          `Missing on the server: ${missing}. Add them in Vercel → Project Settings → Environment Variables (Production), then Redeploy.`,
+        )
+      })
+      .catch(() => {
+        setConfigError(
+          'Could not reach /api/health. Confirm the latest API routing is deployed, then check Vercel environment variables.',
+        )
+      })
   }, [])
 
   useEffect(() => {
@@ -294,10 +309,9 @@ export default function App() {
         onRemove={removeCampaign}
       />
       <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {!configured ? (
+        {configError ? (
           <div className="shrink-0 border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">
-            SerpAPI or Supabase is not configured. Set SERPAPI_KEY, SUPABASE_URL, and
-            SUPABASE_PUBLISHABLE_KEY, then restart.
+            {configError}
           </div>
         ) : null}
         <div className="shrink-0">

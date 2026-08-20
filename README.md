@@ -34,13 +34,13 @@ Open [http://localhost:5173](http://localhost:5173). Vite proxies `/api` to the 
 
 ## Vercel
 
-Set these environment variables on the Vercel project:
+Local `.env` is not deployed. Add the same keys in **Vercel → Project → Settings → Environment Variables** for **Production** (and Preview if you use it), then **Redeploy**:
 
 - `SERPAPI_KEY`
 - `SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_ANON_KEY`)
 
-The API is served from `api/index.ts`. Scraped campaigns and reviews are upserted into Supabase on every page.
+The API is served from `api/health.ts` and `api/[...path].ts`. Scraped campaigns and reviews are upserted into Supabase on every page.
 
 ## Usage
 

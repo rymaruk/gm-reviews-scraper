@@ -1,4 +1,5 @@
 import type { ParsedMapsLink } from './maps-url.ts'
+import { getSerpapiKey } from './env.ts'
 
 const SERPAPI_URL = 'https://serpapi.com/search.json'
 
@@ -149,7 +150,7 @@ export async function fetchReviewsPage(input: {
 }
 
 async function serpapiSearch(params: SerpSearchParams): Promise<Record<string, unknown>> {
-  const apiKey = process.env.SERPAPI_KEY
+  const apiKey = getSerpapiKey()
   if (!apiKey) {
     throw new Error('SERPAPI_KEY is not configured on the server.')
   }

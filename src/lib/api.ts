@@ -12,6 +12,7 @@ export async function getHealth(): Promise<{
   ok: boolean
   configured: boolean
   supabase: boolean
+  missing?: string[]
 }> {
   const response = await fetch('/api/health')
   return parseJson(response)
