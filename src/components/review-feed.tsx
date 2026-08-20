@@ -2,6 +2,7 @@ import { MapPinIcon } from 'lucide-react'
 
 import { ReviewCard } from '@/components/review-card'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { campaignDisplayName } from '@/lib/place'
 import { groupReviewsByCompany, groupReviewsByDay } from '@/lib/reviews'
 import type { Campaign, SortOption, StoredReview } from '@/lib/types'
@@ -12,12 +13,18 @@ export function ReviewFeed({
   reviews,
   activeId,
   sort,
+  loading = false,
 }: {
   campaigns: Campaign[]
   reviews: StoredReview[]
   activeId: string
   sort: SortOption
+  loading?: boolean
 }) {
+  if (loading) {
+    return <ReviewFeedSkeleton />
+  }
+
   if (campaigns.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
@@ -103,6 +110,29 @@ export function ReviewFeed({
           </section>
         )
       })}
+    </div>
+  )
+}
+
+function ReviewFeedSkeleton() {
+  return (
+    <div className="flex flex-col gap-10 p-4 pb-24">
+      {Array.from({ length: 3 }, (_, index) => (
+        <section key={index} className="rounded-2xl border bg-card p-4 shadow-sm">
+          <div className="mb-4 flex items-start gap-3">
+            <Skeleton className="size-12 shrink-0 rounded-xl" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-72 max-w-full" />
+            </div>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-24 w-full rounded-xl" />
+          </div>
+        </section>
+      ))}
     </div>
   )
 }

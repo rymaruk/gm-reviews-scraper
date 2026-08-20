@@ -9,6 +9,7 @@ import {
   ScrapeProgressDialog,
   type ScrapeDialogState,
 } from '@/components/scrape-progress-dialog'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   deleteCampaign as deleteCampaignApi,
   fetchReviewsPage,
@@ -39,6 +40,7 @@ export default function App() {
   const [adding, setAdding] = useState(false)
   const [configError, setConfigError] = useState<string | null>(null)
   const [scrapeDialog, setScrapeDialog] = useState<ScrapeDialogState>({ status: 'idle' })
+  const [storeLoading, setStoreLoading] = useState(true)
   const feedRef = useRef<HTMLDivElement>(null)
   const scrolledFromUrl = useRef(false)
   const scrollingToRef = useRef<string | null>(null)
@@ -52,6 +54,7 @@ export default function App() {
       .catch((error: unknown) => {
         toast.error(error instanceof Error ? error.message : 'Could not load saved reviews.')
       })
+      .finally(() => setStoreLoading(false))
 
     void getHealth()
       .then((health) => {
@@ -432,6 +435,7 @@ export default function App() {
         campaigns={campaigns}
         selectedId={activeId}
         reviewCounts={reviewCounts}
+        loading={storeLoading}
         onSelect={selectCompany}
         onAdd={() => setDialogOpen(true)}
         onScrape={(campaign) => void scrapeCampaign(campaign, { reset: true })}
@@ -464,7 +468,12 @@ export default function App() {
           />
         </div>
         <div ref={feedRef} className="min-h-0 flex-1 overflow-y-auto">
-          {campaigns.length > 0 ? (
+          {storeLoading ? (
+            <div className="flex items-baseline justify-between gap-4 px-4 pt-4">
+              <Skeleton className="h-4 w-64" />
+              <Skeleton className="h-4 w-40" />
+            </div>
+          ) : campaigns.length > 0 ? (
             <div className="flex items-baseline justify-between gap-4 px-4 pt-4">
               <p className="text-sm text-muted-foreground">
                 Showing {visibleReviews.length} review{visibleReviews.length === 1 ? '' : 's'} grouped
@@ -480,6 +489,7 @@ export default function App() {
             reviews={visibleReviews}
             activeId={activeId}
             sort={sort}
+            loading={storeLoading}
           />
         </div>
       </main>

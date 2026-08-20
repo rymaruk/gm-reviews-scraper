@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Skeleton } from '@/components/ui/skeleton'
 import { campaignDisplayName } from '@/lib/place'
 import type { Campaign } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -22,6 +23,7 @@ export function CampaignSidebar({
   campaigns,
   selectedId,
   reviewCounts,
+  loading = false,
   onSelect,
   onAdd,
   onScrape,
@@ -30,6 +32,7 @@ export function CampaignSidebar({
   campaigns: Campaign[]
   selectedId: string
   reviewCounts: Record<string, number>
+  loading?: boolean
   onSelect: (id: string) => void
   onAdd: () => void
   onScrape: (campaign: Campaign) => void
@@ -99,7 +102,9 @@ export function CampaignSidebar({
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-1 px-3 pb-4">
-          {campaigns.length === 0 ? (
+          {loading ? (
+            <SidebarListSkeleton />
+          ) : campaigns.length === 0 ? (
             <div className="rounded-xl border border-dashed px-3 py-8 text-center text-sm text-muted-foreground">
               Add a Google Maps shop link to start collecting reviews.
             </div>
@@ -199,5 +204,24 @@ export function CampaignSidebar({
         </DialogContent>
       </Dialog>
     </aside>
+  )
+}
+
+function SidebarListSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 6 }, (_, index) => (
+        <div key={index} className="flex min-w-full flex-col rounded-xl px-3 py-3">
+          <div className="flex w-full items-start gap-3">
+            <Skeleton className="size-8 shrink-0 rounded-lg" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-36 max-w-full" />
+              <Skeleton className="h-3 w-52 max-w-full" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </>
   )
 }
