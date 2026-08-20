@@ -3,6 +3,7 @@ import { placeNameFromMapsUrl, preferName } from '../src/lib/place.js'
 import type { Campaign } from '../src/lib/types.js'
 import {
   deleteCampaign,
+  findExistingCampaign,
   getCampaign,
   listCampaigns,
   listReviews,
@@ -77,10 +78,23 @@ export async function handleResolvePlace(body: unknown): Promise<ApiResult> {
 
     const page = await resolveCampaign(parsed)
     const id = campaignIdentity(page.place)
-    const existing = await getCampaign(id)
+    const existing = await findExistingCampaign({
+      id,
+      address: page.place.address,
+      mapsUrl: parsed.resolvedUrl || parsed.originalUrl,
+      dataId: page.place.dataId,
+      placeId: page.place.placeId,
+    })
+
+    if (existing) {
+      return {
+        status: 409,
+        body: { error: 'This address has already been scraped.' },
+      }
+    }
+
     const title = preferName(
       page.place.title,
-      existing?.title,
       placeNameFromMapsUrl(parsed.resolvedUrl),
       placeNameFromMapsUrl(parsed.originalUrl),
     )
@@ -89,14 +103,14 @@ export async function handleResolvePlace(body: unknown): Promise<ApiResult> {
       id,
       mapsUrl: parsed.resolvedUrl || parsed.originalUrl,
       title,
-      address: page.place.address || existing?.address,
-      rating: page.place.rating ?? existing?.rating,
-      reviewsCount: page.place.reviewsCount ?? existing?.reviewsCount,
-      type: page.place.type ?? existing?.type,
-      thumbnail: page.place.thumbnail ?? existing?.thumbnail,
-      dataId: page.place.dataId ?? existing?.dataId,
-      placeId: page.place.placeId ?? existing?.placeId,
-      createdAt: existing?.createdAt ?? new Date().toISOString(),
+      address: page.place.address,
+      rating: page.place.rating,
+      reviewsCount: page.place.reviewsCount,
+      type: page.place.type,
+      thumbnail: page.place.thumbnail,
+      dataId: page.place.dataId,
+      placeId: page.place.placeId,
+      createdAt: new Date().toISOString(),
       lastScrapedAt: new Date().toISOString(),
       scrapeStatus: page.nextPageToken ? 'scraping' : 'done',
       nextPageToken: page.nextPageToken,

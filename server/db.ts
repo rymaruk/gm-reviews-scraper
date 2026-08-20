@@ -55,6 +55,20 @@ export async function getCampaign(id: string): Promise<Campaign | undefined> {
   return data ? fromCampaignRow(data as CampaignRow) : undefined
 }
 
+export async function findExistingCampaign(input: {
+  id: string
+  address?: string
+  mapsUrl?: string
+  dataId?: string
+  placeId?: string
+}): Promise<Campaign | undefined> {
+  const byId = await getCampaign(input.id)
+  if (byId) return byId
+
+  const campaigns = await listCampaigns()
+  return campaigns.find((campaign) => isSameCampaign(campaign, input))
+}
+
 export async function upsertCampaign(campaign: Campaign): Promise<void> {
   const { error } = await getSupabase().from('campaigns').upsert(toCampaignRow(campaign), {
     onConflict: 'id',
@@ -182,4 +196,22 @@ function fromReviewRow(row: ReviewRow): StoredReview {
       reviews: row.user_reviews ?? undefined,
     },
   }
+}
+
+function isSameCampaign(
+  campaign: Campaign,
+  input: { id: string; address?: string; mapsUrl?: string; dataId?: string; placeId?: string },
+): boolean {
+  if (campaign.id === input.id) return true
+  if (input.dataId && campaign.dataId === input.dataId) return true
+  if (input.placeId && campaign.placeId === input.placeId) return true
+  if (input.mapsUrl && campaign.mapsUrl === input.mapsUrl) return true
+  if (input.address && campaign.address && normalizeAddress(campaign.address) === normalizeAddress(input.address)) {
+    return true
+  }
+  return false
+}
+
+function normalizeAddress(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase()
 }

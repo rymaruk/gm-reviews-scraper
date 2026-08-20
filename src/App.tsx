@@ -149,41 +149,66 @@ export default function App() {
   async function addCampaigns(urls: string[]) {
     setAdding(true)
     const knownIds = new Set(campaigns.map((campaign) => campaign.id))
+    const knownUrls = new Set(campaigns.map((campaign) => campaign.mapsUrl))
+    const alreadyScraped: string[] = []
+    let added = 0
 
     try {
       for (const url of urls) {
-        const result = await resolvePlace(url)
-        const campaign = result.campaign
-        const id = campaign.id
-        const title = campaignDisplayName(campaign)
-
-        if (knownIds.has(id)) {
-          toast.message(`${title} is already in the list. Scraping latest reviews.`)
-          const existing = campaigns.find((campaign) => campaign.id === id)
-          if (existing) await scrapeCampaign(existing, { reset: true })
-          selectCompany(id)
+        if (knownUrls.has(url)) {
+          alreadyScraped.push(url)
           continue
         }
 
-        knownIds.add(id)
+        try {
+          const result = await resolvePlace(url)
+          const campaign = result.campaign
+          const id = campaign.id
+          const title = campaignDisplayName(campaign)
 
-        setCampaigns((current) => [campaign, ...current.filter((item) => item.id !== id)])
-        setReviews((current) =>
-          mergeReviews(
-            current,
-            result.reviews.map((review) => ({ ...review, campaignId: id })),
-          ),
-        )
-        toast.success(`Added ${title}`)
-        selectCompany(id)
+          if (knownIds.has(id)) {
+            alreadyScraped.push(title)
+            continue
+          }
 
-        if (result.nextPageToken) {
-          await scrapeCampaign({ ...campaign, nextPageToken: result.nextPageToken })
+          knownIds.add(id)
+          knownUrls.add(campaign.mapsUrl)
+          added += 1
+
+          setCampaigns((current) => [campaign, ...current.filter((item) => item.id !== id)])
+          setReviews((current) =>
+            mergeReviews(
+              current,
+              result.reviews.map((review) => ({ ...review, campaignId: id })),
+            ),
+          )
+          toast.success(`Added ${title}`)
+          selectCompany(id)
+
+          if (result.nextPageToken) {
+            await scrapeCampaign({ ...campaign, nextPageToken: result.nextPageToken })
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Could not add campaign.'
+          if (/already been scraped/i.test(message)) {
+            alreadyScraped.push(url)
+            continue
+          }
+          toast.error(message)
+          throw error instanceof Error ? error : new Error(message)
         }
       }
-      setDialogOpen(false)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not add campaign.')
+
+      if (alreadyScraped.length > 0) {
+        const message =
+          alreadyScraped.length === 1
+            ? 'This address has already been scraped.'
+            : `${alreadyScraped.length} of these addresses have already been scraped.`
+        toast.error(message)
+        throw new Error(message)
+      }
+
+      if (added > 0) setDialogOpen(false)
     } finally {
       setAdding(false)
     }

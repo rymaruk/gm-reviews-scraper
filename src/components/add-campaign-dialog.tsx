@@ -25,6 +25,7 @@ export function AddCampaignDialog({
   pending: boolean
 }) {
   const [value, setValue] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -34,12 +35,23 @@ export function AddCampaignDialog({
       .filter(Boolean)
 
     if (urls.length === 0) return
-    await onSubmit(urls)
-    setValue('')
+    setError(null)
+    try {
+      await onSubmit(urls)
+      setValue('')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not add campaign.')
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) setError(null)
+        onOpenChange(nextOpen)
+      }}
+    >
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
@@ -51,6 +63,11 @@ export function AddCampaignDialog({
           </DialogHeader>
 
           <div className="grid gap-2 py-4">
+            {error ? (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            ) : null}
             <Label htmlFor="maps-urls">Google Maps links</Label>
             <Textarea
               id="maps-urls"
