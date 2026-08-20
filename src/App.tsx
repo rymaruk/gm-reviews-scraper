@@ -6,6 +6,10 @@ import { CampaignSidebar } from '@/components/campaign-sidebar'
 import { FiltersBar } from '@/components/filters-bar'
 import { ReviewFeed } from '@/components/review-feed'
 import {
+  ScrapeProgressDialog,
+  type ScrapeDialogState,
+} from '@/components/scrape-progress-dialog'
+import {
   deleteCampaign as deleteCampaignApi,
   fetchReviewsPage,
   fetchStore,
@@ -34,6 +38,7 @@ export default function App() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [adding, setAdding] = useState(false)
   const [configError, setConfigError] = useState<string | null>(null)
+  const [scrapeDialog, setScrapeDialog] = useState<ScrapeDialogState>({ status: 'idle' })
   const feedRef = useRef<HTMLDivElement>(null)
   const scrolledFromUrl = useRef(false)
   const scrollingToRef = useRef<string | null>(null)
@@ -131,6 +136,18 @@ export default function App() {
     [reviews, campaigns, query, rating, sort, timeRange, fromDate, toDate],
   )
 
+  const lastScrapedAt = useMemo(() => {
+    const relevant =
+      activeId === 'all' ? campaigns : campaigns.filter((campaign) => campaign.id === activeId)
+    const timestamps = relevant
+      .map((campaign) => campaign.lastScrapedAt)
+      .filter((value): value is string => Boolean(value))
+      .map((value) => Date.parse(value))
+      .filter((value) => !Number.isNaN(value))
+    if (timestamps.length === 0) return undefined
+    return new Date(Math.max(...timestamps))
+  }, [campaigns, activeId])
+
   useEffect(() => {
     const root = feedRef.current
     if (!root) return
@@ -227,6 +244,7 @@ export default function App() {
         }
 
         try {
+          setScrapeDialog({ status: 'running', name: 'Looking up shop…' })
           const result = await resolvePlace(url)
           const campaign = result.campaign
           const id = campaign.id
@@ -234,6 +252,7 @@ export default function App() {
 
           if (knownIds.has(id)) {
             alreadyScraped.push(title)
+            setScrapeDialog({ status: 'idle' })
             continue
           }
 
@@ -252,14 +271,21 @@ export default function App() {
           selectCompany(id)
 
           if (result.nextPageToken) {
-            await scrapeCampaign({ ...campaign, nextPageToken: result.nextPageToken })
+            const ok = await scrapeCampaign(
+              { ...campaign, nextPageToken: result.nextPageToken },
+              { closeOnSuccess: false },
+            )
+            if (!ok) return
           }
+          setScrapeDialog({ status: 'idle' })
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Could not add campaign.'
           if (/already been scraped/i.test(message)) {
             alreadyScraped.push(url)
+            setScrapeDialog({ status: 'idle' })
             continue
           }
+          setScrapeDialog({ status: 'error', name: 'this shop', message })
           toast.error(message)
           throw error instanceof Error ? error : new Error(message)
         }
@@ -280,7 +306,12 @@ export default function App() {
     }
   }
 
-  async function scrapeCampaign(campaign: Campaign, options?: { reset?: boolean }) {
+  async function scrapeCampaign(
+    campaign: Campaign,
+    options?: { reset?: boolean; closeOnSuccess?: boolean },
+  ): Promise<boolean> {
+    const fallbackName = campaignDisplayName(campaign)
+    setScrapeDialog({ status: 'running', name: fallbackName })
     setCampaigns((current) =>
       current.map((item) =>
         item.id === campaign.id
@@ -292,7 +323,6 @@ export default function App() {
     let token = options?.reset ? undefined : campaign.nextPageToken
     let page = options?.reset ? 0 : 1
     let previousToken: string | undefined
-    const fallbackName = campaignDisplayName(campaign)
 
     try {
       do {
@@ -346,6 +376,8 @@ export default function App() {
 
       await patchCampaign(campaign.id, { scrapeStatus: 'done', nextPageToken: token }).catch(() => undefined)
       toast.success(`Finished scraping ${fallbackName}`)
+      if (options?.closeOnSuccess !== false) setScrapeDialog({ status: 'idle' })
+      return true
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Scrape failed.'
       setCampaigns((current) =>
@@ -359,13 +391,17 @@ export default function App() {
         () => undefined,
       )
       toast.error(message)
+      setScrapeDialog({ status: 'error', name: fallbackName, message })
+      return false
     }
   }
 
   async function scrapeAll() {
     for (const campaign of campaigns) {
-      await scrapeCampaign(campaign, { reset: true })
+      const ok = await scrapeCampaign(campaign, { reset: true, closeOnSuccess: false })
+      if (!ok) return
     }
+    setScrapeDialog({ status: 'idle' })
   }
 
   async function removeCampaign(campaign: Campaign) {
@@ -429,10 +465,15 @@ export default function App() {
         </div>
         <div ref={feedRef} className="min-h-0 flex-1 overflow-y-auto">
           {campaigns.length > 0 ? (
-            <p className="px-4 pt-4 text-sm text-muted-foreground">
-              Showing {visibleReviews.length} review{visibleReviews.length === 1 ? '' : 's'} grouped
-              by company
-            </p>
+            <div className="flex items-baseline justify-between gap-4 px-4 pt-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {visibleReviews.length} review{visibleReviews.length === 1 ? '' : 's'} grouped
+                by company
+              </p>
+              <p className="shrink-0 text-sm text-muted-foreground">
+                Last scraped: {lastScrapedAt ? formatScrapedAt(lastScrapedAt) : '—'}
+              </p>
+            </div>
           ) : null}
           <ReviewFeed
             campaigns={campaigns}
@@ -448,6 +489,17 @@ export default function App() {
         onSubmit={addCampaigns}
         pending={adding}
       />
+      <ScrapeProgressDialog
+        state={scrapeDialog}
+        onClose={() => setScrapeDialog({ status: 'idle' })}
+      />
     </div>
   )
+}
+
+function formatScrapedAt(date: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
 }
