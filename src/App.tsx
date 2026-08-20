@@ -15,24 +15,27 @@ import {
 } from '@/lib/api'
 import { campaignDisplayName, placeNameFromMapsUrl, preferName } from '@/lib/place'
 import { filterReviews, mergeReviews, reviewsToCsv } from '@/lib/reviews'
+import { readFilterParams, writeFilterParams } from '@/lib/search-params'
 import type { Campaign, RatingFilter, SortOption, StoredReview, TimeRange } from '@/lib/types'
 
 const MAX_PAGES = 25
+const initialFilters = readFilterParams()
 
 export default function App() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [reviews, setReviews] = useState<StoredReview[]>([])
-  const [activeId, setActiveId] = useState('all')
-  const [query, setQuery] = useState('')
-  const [rating, setRating] = useState<RatingFilter>('all')
-  const [sort, setSort] = useState<SortOption>('newest')
-  const [timeRange, setTimeRange] = useState<TimeRange>('all')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
+  const [activeId, setActiveId] = useState(initialFilters.company)
+  const [query, setQuery] = useState(initialFilters.query)
+  const [rating, setRating] = useState<RatingFilter>(initialFilters.rating)
+  const [sort, setSort] = useState<SortOption>(initialFilters.sort)
+  const [timeRange, setTimeRange] = useState<TimeRange>(initialFilters.timeRange)
+  const [fromDate, setFromDate] = useState(initialFilters.fromDate)
+  const [toDate, setToDate] = useState(initialFilters.toDate)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [adding, setAdding] = useState(false)
   const [configured, setConfigured] = useState(true)
   const feedRef = useRef<HTMLDivElement>(null)
+  const scrolledFromUrl = useRef(false)
 
   useEffect(() => {
     void fetchStore()
@@ -48,6 +51,45 @@ export default function App() {
       .then((health) => setConfigured(health.configured && health.supabase))
       .catch(() => setConfigured(false))
   }, [])
+
+  useEffect(() => {
+    writeFilterParams({
+      query,
+      rating,
+      sort,
+      timeRange,
+      fromDate,
+      toDate,
+      company: activeId,
+    })
+  }, [query, rating, sort, timeRange, fromDate, toDate, activeId])
+
+  useEffect(() => {
+    function onPopState() {
+      const next = readFilterParams()
+      setQuery(next.query)
+      setRating(next.rating)
+      setSort(next.sort)
+      setTimeRange(next.timeRange)
+      setFromDate(next.fromDate)
+      setToDate(next.toDate)
+      setActiveId(next.company)
+    }
+
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  useEffect(() => {
+    if (scrolledFromUrl.current || activeId === 'all' || campaigns.length === 0) return
+    scrolledFromUrl.current = true
+    window.requestAnimationFrame(() => {
+      document.getElementById(`company-${activeId}`)?.scrollIntoView({
+        behavior: 'auto',
+        block: 'start',
+      })
+    })
+  }, [campaigns, activeId])
 
   const reviewCounts = useMemo(() => {
     const counts: Record<string, number> = {}
