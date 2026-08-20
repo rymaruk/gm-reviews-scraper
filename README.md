@@ -1,35 +1,55 @@
-# Maps Campaign Reviews
+# GoogleMap Review
 
-React app that collects Google Maps reviews for campaign shops. Paste one or more Maps place links, scrape every available review through [SerpAPI](https://serpapi.com), and group or filter them by campaign.
+React app that collects Google Maps reviews for campaign shops. Paste Maps place links, scrape reviews through [SerpAPI](https://serpapi.com), and store everything in [Supabase](https://supabase.com).
 
 ## Setup
 
-1. Copy `.env.example` to `.env` and set `SERPAPI_KEY`.
+1. Copy `.env.example` to `.env` and set:
+
+```bash
+SERPAPI_KEY=
+SUPABASE_URL=
+SUPABASE_PUBLISHABLE_KEY=
+```
+
 2. Install dependencies:
 
 ```bash
 npm install
 ```
 
-3. Start the API and Vite app together:
+3. Apply the database schema (once):
+
+```bash
+npx supabase db push --db-url "postgresql://postgres:[DB_PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres"
+```
+
+4. Start locally:
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). The Vite dev server proxies `/api` to the Express process on port `8787`.
+Open [http://localhost:5173](http://localhost:5173). Vite proxies `/api` to the Express process on port `8787`.
+
+## Vercel
+
+Set these environment variables on the Vercel project:
+
+- `SERPAPI_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY`
+
+The API is served from `api/index.ts`. Scraped campaigns and reviews are upserted into Supabase on every page.
 
 ## Usage
 
-1. Click **Add** and paste Google Maps shop URLs (one per line). Short `maps.app.goo.gl` links work.
-2. The scraper resolves each marker, then pages through SerpAPI until reviews run out (capped at 25 pages per shop to protect API quota).
-3. Use **All campaigns** to see every review grouped by shop, or filter to a single campaign.
-4. Search, rating, and sort apply across the current view. **Export CSV** downloads the filtered list.
-
-Campaigns and scraped reviews are stored in the browser (`localStorage`). Re-scrape a shop any time to refresh.
+1. Click **Add** and paste Google Maps shop URLs (one per line).
+2. The scraper saves each shop and every review page to Supabase.
+3. Reload the app on any device — the same data comes back from the database.
 
 ## Notes
 
-- The SerpAPI key stays on the server. It is never sent to the browser.
-- Each reviews page uses one SerpAPI search credit. Shops with thousands of reviews will consume more credits.
+- SerpAPI and Supabase keys stay on the server.
+- Each reviews page uses one SerpAPI search credit.
 - Do not commit `.env`.

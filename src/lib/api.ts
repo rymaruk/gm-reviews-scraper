@@ -1,4 +1,4 @@
-import type { PlaceInfo, Review, ReviewsPage } from '@/lib/types'
+import type { Campaign, PlaceInfo, Review, ReviewsPage, StoredReview } from '@/lib/types'
 
 async function parseJson<T>(response: Response): Promise<T> {
   const data = (await response.json()) as T & { error?: string }
@@ -8,8 +8,17 @@ async function parseJson<T>(response: Response): Promise<T> {
   return data
 }
 
-export async function getHealth(): Promise<{ ok: boolean; configured: boolean }> {
+export async function getHealth(): Promise<{
+  ok: boolean
+  configured: boolean
+  supabase: boolean
+}> {
   const response = await fetch('/api/health')
+  return parseJson(response)
+}
+
+export async function fetchStore(): Promise<{ campaigns: Campaign[]; reviews: StoredReview[] }> {
+  const response = await fetch('/api/store')
   return parseJson(response)
 }
 
@@ -19,6 +28,7 @@ export async function resolvePlace(url: string): Promise<{
   place: PlaceInfo
   reviews: Review[]
   nextPageToken?: string
+  campaign: Campaign
 }> {
   const response = await fetch('/api/places/resolve', {
     method: 'POST',
@@ -29,10 +39,12 @@ export async function resolvePlace(url: string): Promise<{
 }
 
 export async function fetchReviewsPage(input: {
+  campaignId?: string
   dataId?: string
   placeId?: string
   nextPageToken?: string
   sortBy?: string
+  scrapeStatus?: Campaign['scrapeStatus']
 }): Promise<ReviewsPage> {
   const response = await fetch('/api/reviews', {
     method: 'POST',
@@ -40,4 +52,27 @@ export async function fetchReviewsPage(input: {
     body: JSON.stringify(input),
   })
   return parseJson(response)
+}
+
+export async function deleteCampaign(id: string): Promise<void> {
+  const response = await fetch(`/api/campaigns/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+  await parseJson(response)
+}
+
+export async function patchCampaign(
+  id: string,
+  patch: {
+    scrapeStatus?: Campaign['scrapeStatus']
+    scrapeError?: string
+    nextPageToken?: string
+  },
+): Promise<void> {
+  const response = await fetch(`/api/campaigns/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+  await parseJson(response)
 }

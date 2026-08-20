@@ -5,17 +5,23 @@ import { AddCampaignDialog } from '@/components/add-campaign-dialog'
 import { CampaignSidebar } from '@/components/campaign-sidebar'
 import { FiltersBar } from '@/components/filters-bar'
 import { ReviewFeed } from '@/components/review-feed'
-import { fetchReviewsPage, getHealth, resolvePlace } from '@/lib/api'
+import {
+  deleteCampaign as deleteCampaignApi,
+  fetchReviewsPage,
+  fetchStore,
+  getHealth,
+  patchCampaign,
+  resolvePlace,
+} from '@/lib/api'
 import { campaignDisplayName, placeNameFromMapsUrl, preferName } from '@/lib/place'
-import { campaignIdentity, filterReviews, mergeReviews, reviewsToCsv } from '@/lib/reviews'
-import { loadCampaigns, loadReviews, saveCampaigns, saveReviews } from '@/lib/storage'
+import { filterReviews, mergeReviews, reviewsToCsv } from '@/lib/reviews'
 import type { Campaign, RatingFilter, SortOption, StoredReview, TimeRange } from '@/lib/types'
 
 const MAX_PAGES = 25
 
 export default function App() {
-  const [campaigns, setCampaigns] = useState<Campaign[]>(loadCampaigns)
-  const [reviews, setReviews] = useState<StoredReview[]>(loadReviews)
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [reviews, setReviews] = useState<StoredReview[]>([])
   const [activeId, setActiveId] = useState('all')
   const [query, setQuery] = useState('')
   const [rating, setRating] = useState<RatingFilter>('all')
@@ -29,16 +35,17 @@ export default function App() {
   const feedRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    saveCampaigns(campaigns)
-  }, [campaigns])
+    void fetchStore()
+      .then((store) => {
+        setCampaigns(store.campaigns)
+        setReviews(store.reviews)
+      })
+      .catch((error: unknown) => {
+        toast.error(error instanceof Error ? error.message : 'Could not load saved reviews.')
+      })
 
-  useEffect(() => {
-    saveReviews(reviews)
-  }, [reviews])
-
-  useEffect(() => {
     void getHealth()
-      .then((health) => setConfigured(health.configured))
+      .then((health) => setConfigured(health.configured && health.supabase))
       .catch(() => setConfigured(false))
   }, [])
 
@@ -87,12 +94,9 @@ export default function App() {
     try {
       for (const url of urls) {
         const result = await resolvePlace(url)
-        const id = campaignIdentity(result.place)
-        const title = preferName(
-          result.place.title,
-          placeNameFromMapsUrl(result.resolvedUrl),
-          placeNameFromMapsUrl(result.url),
-        )
+        const campaign = result.campaign
+        const id = campaign.id
+        const title = campaignDisplayName(campaign)
 
         if (knownIds.has(id)) {
           toast.message(`${title} is already in the list. Scraping latest reviews.`)
@@ -103,23 +107,6 @@ export default function App() {
         }
 
         knownIds.add(id)
-
-        const campaign: Campaign = {
-          id,
-          mapsUrl: result.resolvedUrl || result.url,
-          title,
-          address: result.place.address,
-          rating: result.place.rating,
-          reviewsCount: result.place.reviewsCount,
-          type: result.place.type,
-          thumbnail: result.place.thumbnail,
-          dataId: result.place.dataId,
-          placeId: result.place.placeId,
-          createdAt: new Date().toISOString(),
-          lastScrapedAt: new Date().toISOString(),
-          scrapeStatus: result.nextPageToken ? 'scraping' : 'done',
-          nextPageToken: result.nextPageToken,
-        }
 
         setCampaigns((current) => [campaign, ...current.filter((item) => item.id !== id)])
         setReviews((current) =>
@@ -162,10 +149,12 @@ export default function App() {
         if (token && token === previousToken) break
         previousToken = token
         const result = await fetchReviewsPage({
+          campaignId: campaign.id,
           dataId: campaign.dataId,
           placeId: campaign.placeId,
           nextPageToken: token,
           sortBy: 'newestFirst',
+          scrapeStatus: 'scraping',
         })
 
         setReviews((current) =>
@@ -205,6 +194,7 @@ export default function App() {
         )
       } while (token && page < MAX_PAGES)
 
+      await patchCampaign(campaign.id, { scrapeStatus: 'done', nextPageToken: token }).catch(() => undefined)
       toast.success(`Finished scraping ${fallbackName}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Scrape failed.'
@@ -214,6 +204,9 @@ export default function App() {
             ? { ...item, scrapeStatus: 'error', scrapeError: message }
             : item,
         ),
+      )
+      await patchCampaign(campaign.id, { scrapeStatus: 'error', scrapeError: message }).catch(
+        () => undefined,
       )
       toast.error(message)
     }
@@ -225,10 +218,15 @@ export default function App() {
     }
   }
 
-  function removeCampaign(campaign: Campaign) {
-    setCampaigns((current) => current.filter((item) => item.id !== campaign.id))
-    setReviews((current) => current.filter((review) => review.campaignId !== campaign.id))
-    if (activeId === campaign.id) setActiveId('all')
+  async function removeCampaign(campaign: Campaign) {
+    try {
+      await deleteCampaignApi(campaign.id)
+      setCampaigns((current) => current.filter((item) => item.id !== campaign.id))
+      setReviews((current) => current.filter((review) => review.campaignId !== campaign.id))
+      if (activeId === campaign.id) setActiveId('all')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not delete campaign.')
+    }
   }
 
   function exportCsv() {
@@ -256,7 +254,8 @@ export default function App() {
       <main className="flex min-h-0 min-w-0 flex-1 flex-col">
         {!configured ? (
           <div className="shrink-0 border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">
-            SerpAPI is not configured. Add SERPAPI_KEY to a local .env file and restart the server.
+            SerpAPI or Supabase is not configured. Set SERPAPI_KEY, SUPABASE_URL, and
+            SUPABASE_PUBLISHABLE_KEY, then restart.
           </div>
         ) : null}
         <div className="shrink-0">
