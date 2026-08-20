@@ -36,6 +36,7 @@ export default function App() {
   const [configError, setConfigError] = useState<string | null>(null)
   const feedRef = useRef<HTMLDivElement>(null)
   const scrolledFromUrl = useRef(false)
+  const scrollingToRef = useRef<string | null>(null)
 
   useEffect(() => {
     void fetchStore()
@@ -100,6 +101,7 @@ export default function App() {
   useEffect(() => {
     if (scrolledFromUrl.current || activeId === 'all' || campaigns.length === 0) return
     scrolledFromUrl.current = true
+    scrollingToRef.current = activeId
     window.requestAnimationFrame(() => {
       document.getElementById(`company-${activeId}`)?.scrollIntoView({
         behavior: 'auto',
@@ -129,10 +131,73 @@ export default function App() {
     [reviews, campaigns, query, rating, sort, timeRange, fromDate, toDate],
   )
 
+  useEffect(() => {
+    const root = feedRef.current
+    if (!root) return
+
+    let frame = 0
+
+    function syncActiveFromScroll() {
+      if (scrollingToRef.current === 'all') {
+        if (root.scrollTop > 16) return
+        scrollingToRef.current = null
+        return
+      }
+
+      if (scrollingToRef.current) {
+        const target = document.getElementById(`company-${scrollingToRef.current}`)
+        if (target) {
+          const offset = target.getBoundingClientRect().top - root.getBoundingClientRect().top
+          if (Math.abs(offset) > 64) return
+        }
+        scrollingToRef.current = null
+      }
+
+      const sections = [...root.querySelectorAll<HTMLElement>('[id^="company-"]')]
+      if (sections.length === 0) return
+
+      const marker = root.getBoundingClientRect().top + 96
+      let current = sections[0]
+      for (const section of sections) {
+        if (section.getBoundingClientRect().top <= marker) current = section
+        else break
+      }
+
+      const id = current.id.slice('company-'.length)
+      setActiveId((prev) => (prev === id ? prev : id))
+    }
+
+    function onScroll() {
+      if (frame) return
+      frame = window.requestAnimationFrame(() => {
+        frame = 0
+        syncActiveFromScroll()
+      })
+    }
+
+    root.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      root.removeEventListener('scroll', onScroll)
+      if (frame) window.cancelAnimationFrame(frame)
+    }
+  }, [campaigns, visibleReviews])
+
+  useEffect(() => {
+    if (activeId === 'all') return
+    document
+      .querySelector(`[data-campaign-id="${CSS.escape(activeId)}"]`)
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [activeId])
+
   const scraping = campaigns.some((campaign) => campaign.scrapeStatus === 'scraping')
 
   function selectCompany(id: string) {
+    scrollingToRef.current = id
     setActiveId(id)
+    window.setTimeout(() => {
+      if (scrollingToRef.current === id) scrollingToRef.current = null
+    }, 800)
+
     if (id === 'all') {
       feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
       return

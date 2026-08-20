@@ -64,6 +64,7 @@ export function CampaignSidebar({
               return (
                 <div
                   key={campaign.id}
+                  data-campaign-id={campaign.id}
                   className={cn(
                     'flex min-w-full flex-col rounded-xl px-3 py-3 transition-colors',
                     active ? 'bg-background shadow-sm ring-1 ring-foreground/10' : 'hover:bg-background/70',
