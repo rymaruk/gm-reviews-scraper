@@ -7,7 +7,7 @@ import {
   handleResolvePlace,
   handleReviews,
   handleStore,
-} from './handlers.ts'
+} from './handlers.js'
 
 export const app = express()
 

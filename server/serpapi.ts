@@ -1,5 +1,5 @@
-import type { ParsedMapsLink } from './maps-url.ts'
-import { getSerpapiKey } from './env.ts'
+import type { ParsedMapsLink } from './maps-url.js'
+import { getSerpapiKey } from './env.js'
 
 const SERPAPI_URL = 'https://serpapi.com/search.json'
 

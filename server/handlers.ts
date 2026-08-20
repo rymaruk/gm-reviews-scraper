@@ -1,6 +1,6 @@
-import { campaignIdentity } from '../src/lib/reviews.ts'
-import { placeNameFromMapsUrl, preferName } from '../src/lib/place.ts'
-import type { Campaign } from '../src/lib/types.ts'
+import { campaignIdentity } from '../src/lib/reviews.js'
+import { placeNameFromMapsUrl, preferName } from '../src/lib/place.js'
+import type { Campaign } from '../src/lib/types.js'
 import {
   deleteCampaign,
   getCampaign,
@@ -8,20 +8,11 @@ import {
   listReviews,
   upsertCampaign,
   upsertReviews,
-} from './db.ts'
-import { healthPayload } from './env.ts'
-import { hasPlaceIdentifier, parseAndExpandMapsUrl } from './maps-url.ts'
-import { fetchReviewsPage, resolveCampaign } from './serpapi.ts'
+} from './db.js'
+import { hasPlaceIdentifier, parseAndExpandMapsUrl } from './maps-url.js'
+import { fetchReviewsPage, resolveCampaign } from './serpapi.js'
 
 export type ApiResult = { status: number; body: unknown }
-
-export function toResponse(result: ApiResult): Response {
-  return Response.json(result.body, { status: result.status })
-}
-
-export function handleHealth(): ApiResult {
-  return { status: 200, body: healthPayload() }
-}
 
 export async function handleStore(): Promise<ApiResult> {
   try {
@@ -184,14 +175,6 @@ export async function readJsonBody(request: Request): Promise<unknown> {
   } catch {
     return {}
   }
-}
-
-export async function routeParam(
-  context: { params: { id: string } | Promise<{ id: string }> },
-  name: 'id' = 'id',
-): Promise<string> {
-  const params = await context.params
-  return params[name]
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

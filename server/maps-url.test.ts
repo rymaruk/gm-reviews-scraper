@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { parseMapsUrl } from './maps-url.ts'
+import { parseMapsUrl } from './maps-url.js'
 
 describe('parseMapsUrl', () => {
   it('extracts data_id and coordinates from a place URL', () => {

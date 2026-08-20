@@ -6,15 +6,19 @@
       "maxDuration": 10
     },
     "api/store.ts": {
+      "includeFiles": "{server,src/lib}/**",
       "maxDuration": 30
     },
     "api/reviews.ts": {
+      "includeFiles": "{server,src/lib}/**",
       "maxDuration": 60
     },
     "api/places/resolve.ts": {
+      "includeFiles": "{server,src/lib}/**",
       "maxDuration": 60
     },
     "api/campaigns/[id].ts": {
+      "includeFiles": "{server,src/lib}/**",
       "maxDuration": 30
     }
   },

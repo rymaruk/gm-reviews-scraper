@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app } from './app.ts'
+import { app } from './app.js'
 
 const port = Number(process.env.PORT ?? 8787)
 const rootDir = path.dirname(fileURLToPath(import.meta.url))

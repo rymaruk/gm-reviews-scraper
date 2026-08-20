@@ -2,18 +2,26 @@ import {
   handleDeleteCampaign,
   handlePatchCampaign,
   readJsonBody,
-  routeParam,
-  toResponse,
-} from '../../server/handlers.ts'
+} from '../../server/handlers.js'
+import { jsonResult, methodNotAllowed, webHandler } from '../../server/runtime.js'
 
-type RouteContext = { params: { id: string } | Promise<{ id: string }> }
+export const runtime = 'nodejs'
 
-export async function DELETE(_request: Request, context: RouteContext) {
-  return toResponse(await handleDeleteCampaign(await routeParam(context)))
+function campaignId(request: Request): string {
+  const parts = new URL(request.url).pathname.split('/').filter(Boolean)
+  return decodeURIComponent(parts.at(-1) ?? '')
 }
 
-export async function PATCH(request: Request, context: RouteContext) {
-  return toResponse(
-    await handlePatchCampaign(await routeParam(context), await readJsonBody(request)),
-  )
+export async function DELETE(request: Request) {
+  return jsonResult(await handleDeleteCampaign(campaignId(request)))
 }
+
+export async function PATCH(request: Request) {
+  return jsonResult(await handlePatchCampaign(campaignId(request), await readJsonBody(request)))
+}
+
+export default webHandler((request) => {
+  if (request.method === 'DELETE') return DELETE(request)
+  if (request.method === 'PATCH') return PATCH(request)
+  return methodNotAllowed()
+})

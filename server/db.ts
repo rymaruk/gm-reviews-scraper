@@ -1,5 +1,5 @@
-import type { Campaign, StoredReview } from '../src/lib/types.ts'
-import { getSupabase } from './supabase.ts'
+import type { Campaign, StoredReview } from '../src/lib/types.js'
+import { getSupabase } from './supabase.js'
 
 const PAGE_SIZE = 1000
 

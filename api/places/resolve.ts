@@ -1,5 +1,13 @@
-import { handleResolvePlace, readJsonBody, toResponse } from '../../server/handlers.ts'
+import { handleResolvePlace, readJsonBody } from '../../server/handlers.js'
+import { jsonResult, methodNotAllowed, webHandler } from '../../server/runtime.js'
+
+export const runtime = 'nodejs'
 
 export async function POST(request: Request) {
-  return toResponse(await handleResolvePlace(await readJsonBody(request)))
+  return jsonResult(await handleResolvePlace(await readJsonBody(request)))
 }
+
+export default webHandler((request) => {
+  if (request.method === 'POST') return POST(request)
+  return methodNotAllowed()
+})

@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-import { getSupabaseKey, getSupabaseUrl, isSupabaseConfigured } from './env.ts'
+import { getSupabaseKey, getSupabaseUrl, isSupabaseConfigured } from './env.js'
 
 let client: SupabaseClient | undefined
 
