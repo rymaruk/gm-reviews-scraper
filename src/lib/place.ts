@@ -1,4 +1,4 @@
-import type { Campaign } from '@/lib/types'
+import type { Campaign } from './types'
 
 const PLACEHOLDER_NAMES = new Set(['unknown place', 'unknown campaign', 'unknown'])
 

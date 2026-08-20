@@ -1,6 +1,10 @@
 import type { Campaign, PlaceInfo, Review, ReviewsPage, StoredReview } from '@/lib/types'
 
 async function parseJson<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!contentType.includes('application/json')) {
+    throw new Error(`API returned ${response.status} ${response.statusText || 'an unexpected response'}.`)
+  }
   const data = (await response.json()) as T & { error?: string }
   if (!response.ok) {
     throw new Error(data.error ?? 'Request failed.')

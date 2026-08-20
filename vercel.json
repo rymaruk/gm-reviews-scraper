@@ -5,13 +5,22 @@
     "api/health.ts": {
       "maxDuration": 10
     },
-    "api/[...path].ts": {
+    "api/store.ts": {
+      "maxDuration": 30
+    },
+    "api/reviews.ts": {
       "maxDuration": 60
+    },
+    "api/places/resolve.ts": {
+      "maxDuration": 60
+    },
+    "api/campaigns/[id].ts": {
+      "maxDuration": 30
     }
   },
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]

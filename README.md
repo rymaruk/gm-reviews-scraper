@@ -40,7 +40,7 @@ Local `.env` is not deployed. Add the same keys in **Vercel → Project → Sett
 - `SUPABASE_URL`
 - `SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_ANON_KEY`)
 
-The API is served from `api/health.ts` and `api/[...path].ts`. Scraped campaigns and reviews are upserted into Supabase on every page.
+The API is served from Vercel Functions in `api/` (`GET`/`POST`/`PATCH`/`DELETE` handlers). Scraped campaigns and reviews are upserted into Supabase on every page.
 
 ## Usage
 

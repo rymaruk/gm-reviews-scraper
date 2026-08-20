@@ -60,9 +60,11 @@ export default function App() {
           `Missing on the server: ${missing}. Add them in Vercel → Project Settings → Environment Variables (Production), then Redeploy.`,
         )
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         setConfigError(
-          'Could not reach /api/health. Confirm the latest API routing is deployed, then check Vercel environment variables.',
+          error instanceof Error
+            ? error.message
+            : 'Could not reach /api/health. Redeploy after the API handler fix.',
         )
       })
   }, [])
