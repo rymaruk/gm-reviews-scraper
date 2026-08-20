@@ -49,14 +49,38 @@ export function ReviewFeed({
             )}
           >
             <header className="sticky top-0 z-10 -mx-4 -mt-4 mb-4 rounded-[26px] border-b bg-card px-4 pt-4 pb-4">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h2 className="font-heading text-xl font-medium">{name}</h2>
-                  <p className="mt-1 text-sm break-all whitespace-normal text-muted-foreground">
-                    {campaign.address ?? campaign.type ?? 'Address unavailable'}
-                  </p>
+              <div className="flex items-start gap-3">
+                {campaign.thumbnail ? (
+                  <img
+                    src={campaign.thumbnail}
+                    alt=""
+                    className="size-12 shrink-0 rounded-xl object-cover"
+                  />
+                ) : (
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-muted">
+                    <MapPinIcon className="size-5 text-muted-foreground" />
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <h2 className="font-heading text-xl font-medium">{name}</h2>
+                    <Badge variant="secondary">{companyReviews.length}</Badge>
+                  </div>
+                  {campaign.mapsUrl ? (
+                    <a
+                      href={campaign.mapsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 block text-sm break-all whitespace-normal text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                    >
+                      {campaign.address ?? campaign.type ?? 'Open in Google Maps'}
+                    </a>
+                  ) : (
+                    <p className="mt-1 text-sm break-all whitespace-normal text-muted-foreground">
+                      {campaign.address ?? campaign.type ?? 'Address unavailable'}
+                    </p>
+                  )}
                 </div>
-                <Badge variant="secondary">{companyReviews.length}</Badge>
               </div>
             </header>
 
