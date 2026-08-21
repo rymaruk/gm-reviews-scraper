@@ -139,10 +139,14 @@ export function campaignMatchesCity(campaign: Pick<Campaign, 'address'>, city: s
   return cityFromAddress(campaign.address)?.toLowerCase() === city.toLowerCase()
 }
 
+const REGION_PATTERN =
+  /\b(oblast|область|обл\.?|province|voivodeship|województwo|krai|kraj|county|region|район|raion|prefecture|governorate|département|departement|kreis|bezirk|autonomous republic|автономна республіка)\b/i
+
 function isCountryOrAdminArea(value: string): boolean {
   const trimmed = value.trim()
   const normalized = trimmed.toLowerCase()
   if (COUNTRIES.has(normalized)) return true
+  if (REGION_PATTERN.test(trimmed)) return true
   if (/^[a-z]{2}$/i.test(trimmed)) return true
   if (/^[a-z]{2}\s*\d/i.test(trimmed)) return true
   if (/^\d{4,6}(?:[-\s]\d{2,4})?$/.test(trimmed)) return true
@@ -151,7 +155,7 @@ function isCountryOrAdminArea(value: string): boolean {
 }
 
 function isStreetNumber(value: string): boolean {
-  return /^\d+[a-z]?$/i.test(value.trim())
+  return /^\d+[a-zа-яёіїєґʹ']*$/iu.test(value.trim())
 }
 
 function stripPostalPrefix(value: string): string {
