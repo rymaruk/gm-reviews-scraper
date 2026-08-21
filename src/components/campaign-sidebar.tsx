@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { campaignDisplayName } from '@/lib/place'
+import { formatCampaignRating } from '@/lib/reviews'
 import type { Campaign } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -139,7 +140,12 @@ export function CampaignSidebar({
                         {campaign.address ?? campaign.type ?? 'Google Maps place'}
                       </span>
                       <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                        {campaign.rating != null && <Stars rating={campaign.rating} />}
+                        {campaign.rating != null ? (
+                          <>
+                            <Stars rating={campaign.rating} />
+                            <span className="tabular-nums">{formatCampaignRating(campaign.rating)}</span>
+                          </>
+                        ) : null}
                         <span>{reviewCounts[campaign.id] ?? 0} reviews</span>
                       </span>
                     </span>

@@ -117,10 +117,27 @@ export function reviewStarCount(rating: number): number {
   return Math.min(5, Math.max(1, Math.round(rating)))
 }
 
-export function reviewsToCsv(reviews: StoredReview[], campaigns: Campaign[]): string {
-  const campaignById = new Map(campaigns.map((campaign) => [campaign.id, campaign]))
+export function formatCampaignRating(rating: number): string {
+  if (!Number.isFinite(rating)) return ''
+  return Number.isInteger(rating) ? String(rating) : rating.toFixed(1)
+}
+
+export function reviewsToCsv(
+  reviews: StoredReview[],
+  campaigns: Campaign[],
+  period?: { timeRange: TimeRange; fromDate?: string; toDate?: string },
+): string {
+  const reviewsByCampaign = new Map<string, StoredReview[]>()
+  for (const review of reviews) {
+    const list = reviewsByCampaign.get(review.campaignId) ?? []
+    list.push(review)
+    reviewsByCampaign.set(review.campaignId, list)
+  }
+
   const header = [
     'campaign',
+    'address',
+    'general_rating',
     'reviewer',
     'rating',
     'date',
@@ -130,23 +147,79 @@ export function reviewsToCsv(reviews: StoredReview[], campaigns: Campaign[]): st
     'review_url',
   ]
 
-  const rows = reviews.map((review) => {
-    const campaign = campaignById.get(review.campaignId)
-    return [
-      campaign ? campaignDisplayName(campaign) : review.campaignId,
-      review.user.name,
-      review.rating,
-      review.isoDate ?? review.date ?? '',
-      review.snippet,
-      review.likes ?? 0,
-      review.source ?? '',
-      review.link ?? '',
-    ]
-      .map(csvCell)
-      .join(',')
-  })
+  const rows: string[] = []
+  rows.push(['Date period', formatCsvDatePeriod(period)].map(csvCell).join(','))
+  rows.push('')
+  rows.push(header.join(','))
 
-  return [header.join(','), ...rows].join('\n')
+  for (const campaign of campaigns) {
+    const name = campaignDisplayName(campaign)
+    const address = campaign.address ?? ''
+    const generalRating =
+      campaign.rating != null ? formatCampaignRating(campaign.rating) : ''
+    const campaignReviews = reviewsByCampaign.get(campaign.id) ?? []
+
+    if (campaignReviews.length === 0) {
+      rows.push(
+        [name, address, generalRating, '', '', '', '0 reviews', '', '', '']
+          .map(csvCell)
+          .join(','),
+      )
+      continue
+    }
+
+    for (const review of campaignReviews) {
+      rows.push(
+        [
+          name,
+          address,
+          generalRating,
+          review.user.name,
+          review.rating,
+          review.isoDate ?? review.date ?? '',
+          review.snippet,
+          review.likes ?? 0,
+          review.source ?? '',
+          review.link ?? '',
+        ]
+          .map(csvCell)
+          .join(','),
+      )
+    }
+  }
+
+  return rows.join('\n')
+}
+
+export function formatCsvDatePeriod(period?: {
+  timeRange: TimeRange
+  fromDate?: string
+  toDate?: string
+}): string {
+  if (!period || period.timeRange === 'all') return 'All time'
+
+  const bounds = timeRangeBounds(period.timeRange, period.fromDate, period.toDate)
+  const from = bounds.from != null ? formatPeriodDate(bounds.from) : ''
+  const to = bounds.to != null ? formatPeriodDate(bounds.to) : ''
+  const span = from && to ? `${from} – ${to}` : from || to
+
+  if (period.timeRange === 'custom') return span || 'Custom range'
+
+  const labels: Record<Exclude<TimeRange, 'all' | 'custom'>, string> = {
+    '7d': 'Last 7 days',
+    '30d': 'Last 30 days',
+    '90d': 'Last 3 months',
+    '365d': 'Last year',
+  }
+  return span ? `${labels[period.timeRange]} (${span})` : labels[period.timeRange]
+}
+
+function formatPeriodDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
 function csvCell(value: string | number): string {

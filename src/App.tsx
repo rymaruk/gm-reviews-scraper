@@ -419,7 +419,11 @@ export default function App() {
   }
 
   function exportCsv() {
-    const csv = reviewsToCsv(visibleReviews, campaigns)
+    const csv = reviewsToCsv(visibleReviews, campaigns, {
+      timeRange,
+      fromDate,
+      toDate,
+    })
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
