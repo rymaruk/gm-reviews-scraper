@@ -105,7 +105,7 @@ export function CampaignSidebar({
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="flex flex-col gap-1 px-3 pb-4">
+        <div className="flex flex-col gap-3 px-3 pb-4">
           {loading ? (
             <SidebarListSkeleton />
           ) : campaigns.length === 0 ? (
@@ -119,7 +119,7 @@ export function CampaignSidebar({
           ) : (
             groupedCampaigns.map((group) => (
               <section key={group.city} className="flex flex-col gap-1">
-                <h2 className="px-3 pt-2 pb-1 text-xs font-medium tracking-wide text-muted-foreground">
+                <h2 className="px-1 pt-1 pb-0.5 text-xs font-semibold tracking-wide text-muted-foreground">
                   {group.city} ({group.campaigns.length})
                 </h2>
                 {group.campaigns.map((campaign) => {
