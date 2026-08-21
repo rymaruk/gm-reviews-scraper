@@ -35,3 +35,125 @@ export function placeNameFromMapsUrl(url?: string): string | undefined {
 export function campaignDisplayName(campaign: Pick<Campaign, 'title' | 'mapsUrl'>): string {
   return preferName(campaign.title, placeNameFromMapsUrl(campaign.mapsUrl))
 }
+
+const COUNTRIES = new Set(
+  [
+    'united states',
+    'usa',
+    'us',
+    'u.s.',
+    'u.s.a.',
+    'united kingdom',
+    'uk',
+    'england',
+    'scotland',
+    'wales',
+    'canada',
+    'australia',
+    'germany',
+    'deutschland',
+    'france',
+    'spain',
+    'españa',
+    'italy',
+    'italia',
+    'poland',
+    'polska',
+    'ukraine',
+    'україна',
+    'укр',
+    'portugal',
+    'netherlands',
+    'nederland',
+    'belgium',
+    'sweden',
+    'norway',
+    'denmark',
+    'finland',
+    'ireland',
+    'austria',
+    'switzerland',
+    'czechia',
+    'czech republic',
+    'slovakia',
+    'hungary',
+    'romania',
+    'bulgaria',
+    'greece',
+    'turkey',
+    'israel',
+    'india',
+    'japan',
+    'china',
+    'brazil',
+    'mexico',
+    'argentina',
+    'chile',
+    'colombia',
+    'south africa',
+    'new zealand',
+    'singapore',
+    'uae',
+    'united arab emirates',
+  ].map((name) => name.toLowerCase()),
+)
+
+export function cityFromAddress(address?: string): string | undefined {
+  if (!address?.trim()) return undefined
+
+  const parts = address
+    .split(',')
+    .map((part) => stripPostalPrefix(part.trim()))
+    .filter(Boolean)
+
+  while (parts.length > 1 && isCountryOrAdminArea(parts.at(-1)!)) {
+    parts.pop()
+  }
+  while (parts.length > 1 && isStreetNumber(parts.at(-1)!)) {
+    parts.pop()
+  }
+
+  const city = parts.at(-1)?.trim()
+  if (!city || isCountryOrAdminArea(city)) return undefined
+  return city
+}
+
+export function campaignCities(campaigns: Array<Pick<Campaign, 'address'>>): string[] {
+  const seen = new Set<string>()
+  const cities: string[] = []
+
+  for (const campaign of campaigns) {
+    const city = cityFromAddress(campaign.address)
+    if (!city) continue
+    const key = city.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    cities.push(city)
+  }
+
+  return cities.sort((left, right) => left.localeCompare(right))
+}
+
+export function campaignMatchesCity(campaign: Pick<Campaign, 'address'>, city: string): boolean {
+  if (!city || city === 'all') return true
+  return cityFromAddress(campaign.address)?.toLowerCase() === city.toLowerCase()
+}
+
+function isCountryOrAdminArea(value: string): boolean {
+  const trimmed = value.trim()
+  const normalized = trimmed.toLowerCase()
+  if (COUNTRIES.has(normalized)) return true
+  if (/^[a-z]{2}$/i.test(trimmed)) return true
+  if (/^[a-z]{2}\s*\d/i.test(trimmed)) return true
+  if (/^\d{4,6}(?:[-\s]\d{2,4})?$/.test(trimmed)) return true
+  if (/^[a-z]{1,2}\d[a-z\d]?\s*\d[a-z]{2}$/i.test(trimmed)) return true
+  return false
+}
+
+function isStreetNumber(value: string): boolean {
+  return /^\d+[a-z]?$/i.test(value.trim())
+}
+
+function stripPostalPrefix(value: string): string {
+  return value.replace(/^\d{2,6}(?:[-\s]\d{2,4})?\s+/, '').trim()
+}

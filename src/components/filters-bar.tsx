@@ -22,6 +22,8 @@ export function FiltersBar({
   timeRange,
   fromDate,
   toDate,
+  city,
+  cities,
   scraping,
   hasCampaigns,
   onQueryChange,
@@ -30,6 +32,7 @@ export function FiltersBar({
   onTimeRangeChange,
   onFromDateChange,
   onToDateChange,
+  onCityChange,
   onScrapeAll,
   onExport,
 }: {
@@ -39,6 +42,8 @@ export function FiltersBar({
   timeRange: TimeRange
   fromDate: string
   toDate: string
+  city: string
+  cities: string[]
   scraping: boolean
   hasCampaigns: boolean
   onQueryChange: (value: string) => void
@@ -47,6 +52,7 @@ export function FiltersBar({
   onTimeRangeChange: (value: TimeRange) => void
   onFromDateChange: (value: string) => void
   onToDateChange: (value: string) => void
+  onCityChange: (value: string) => void
   onScrapeAll: () => void
   onExport: () => void
 }) {
@@ -74,6 +80,19 @@ export function FiltersBar({
               <SelectItem value="90d">Last 3 months</SelectItem>
               <SelectItem value="365d">Last year</SelectItem>
               <SelectItem value="custom">Custom range</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={city} onValueChange={onCityChange} disabled={cities.length === 0}>
+            <SelectTrigger className="w-full sm:w-44" aria-label="Filter by city">
+              <SelectValue placeholder="City" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All cities</SelectItem>
+              {cities.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <div

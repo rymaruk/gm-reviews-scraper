@@ -42,7 +42,7 @@ export function CampaignSidebar({
   const [search, setSearch] = useState('')
   const [pendingRemoval, setPendingRemoval] = useState<Campaign | null>(null)
   const [removing, setRemoving] = useState(false)
-  const totalReviews = Object.values(reviewCounts).reduce((sum, count) => sum + count, 0)
+  const totalReviews = campaigns.reduce((sum, campaign) => sum + (reviewCounts[campaign.id] ?? 0), 0)
   const visibleCampaigns = useMemo(() => {
     const query = search.trim().toLowerCase()
     if (!query) return campaigns

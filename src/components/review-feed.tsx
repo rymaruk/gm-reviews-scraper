@@ -14,12 +14,14 @@ export function ReviewFeed({
   activeId,
   sort,
   loading = false,
+  emptyMessage,
 }: {
   campaigns: Campaign[]
   reviews: StoredReview[]
   activeId: string
   sort: SortOption
   loading?: boolean
+  emptyMessage?: string
 }) {
   if (loading) {
     return <ReviewFeedSkeleton />
@@ -29,10 +31,12 @@ export function ReviewFeed({
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
         <MapPinIcon className="size-8 text-muted-foreground" />
-        <h2 className="font-heading text-lg font-medium">No companies yet</h2>
+        <h2 className="font-heading text-lg font-medium">
+          {emptyMessage ? 'No companies in this city' : 'No companies yet'}
+        </h2>
         <p className="max-w-md text-sm text-muted-foreground">
-          Add Google Maps shop links. Reviews are grouped by company, with the company name and
-          address above each dated list.
+          {emptyMessage ??
+            'Add Google Maps shop links. Reviews are grouped by company, with the company name and address above each dated list.'}
         </p>
       </div>
     )

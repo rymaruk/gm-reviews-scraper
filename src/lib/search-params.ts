@@ -12,6 +12,7 @@ export type FilterParams = {
   fromDate: string
   toDate: string
   company: string
+  city: string
 }
 
 export const defaultFilterParams: FilterParams = {
@@ -22,6 +23,7 @@ export const defaultFilterParams: FilterParams = {
   fromDate: '',
   toDate: '',
   company: 'all',
+  city: 'all',
 }
 
 export function readFilterParams(search = window.location.search): FilterParams {
@@ -30,6 +32,7 @@ export function readFilterParams(search = window.location.search): FilterParams 
   const sort = params.get('sort')
   const range = params.get('range')
   const company = params.get('company')?.trim()
+  const city = params.get('city')?.trim()
 
   return {
     query: params.get('q')?.trim() ?? '',
@@ -39,6 +42,7 @@ export function readFilterParams(search = window.location.search): FilterParams 
     fromDate: params.get('from')?.trim() ?? '',
     toDate: params.get('to')?.trim() ?? '',
     company: company && company.length > 0 ? company : 'all',
+    city: city && city.length > 0 ? city : 'all',
   }
 }
 
@@ -52,6 +56,7 @@ export function writeFilterParams(filters: FilterParams): void {
   if (filters.timeRange === 'custom' && filters.fromDate) params.set('from', filters.fromDate)
   if (filters.timeRange === 'custom' && filters.toDate) params.set('to', filters.toDate)
   if (filters.company !== 'all') params.set('company', filters.company)
+  if (filters.city !== 'all') params.set('city', filters.city)
 
   const query = params.toString()
   const next = query ? `${window.location.pathname}?${query}` : window.location.pathname

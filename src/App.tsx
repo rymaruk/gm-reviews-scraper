@@ -18,7 +18,7 @@ import {
   patchCampaign,
   resolvePlace,
 } from '@/lib/api'
-import { campaignDisplayName, placeNameFromMapsUrl, preferName } from '@/lib/place'
+import { campaignCities, campaignDisplayName, campaignMatchesCity, placeNameFromMapsUrl, preferName } from '@/lib/place'
 import { filterReviews, mergeReviews, reviewsToCsv } from '@/lib/reviews'
 import { readFilterParams, writeFilterParams } from '@/lib/search-params'
 import type { Campaign, RatingFilter, SortOption, StoredReview, TimeRange } from '@/lib/types'
@@ -36,6 +36,7 @@ export default function App() {
   const [timeRange, setTimeRange] = useState<TimeRange>(initialFilters.timeRange)
   const [fromDate, setFromDate] = useState(initialFilters.fromDate)
   const [toDate, setToDate] = useState(initialFilters.toDate)
+  const [city, setCity] = useState(initialFilters.city)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [adding, setAdding] = useState(false)
   const [configError, setConfigError] = useState<string | null>(null)
@@ -87,8 +88,9 @@ export default function App() {
       fromDate,
       toDate,
       company: activeId,
+      city,
     })
-  }, [query, rating, sort, timeRange, fromDate, toDate, activeId])
+  }, [query, rating, sort, timeRange, fromDate, toDate, activeId, city])
 
   useEffect(() => {
     function onPopState() {
@@ -100,6 +102,7 @@ export default function App() {
       setFromDate(next.fromDate)
       setToDate(next.toDate)
       setActiveId(next.company)
+      setCity(next.city)
     }
 
     window.addEventListener('popstate', onPopState)
@@ -126,9 +129,30 @@ export default function App() {
     return counts
   }, [reviews])
 
+  const cities = useMemo(() => campaignCities(campaigns), [campaigns])
+
+  useEffect(() => {
+    if (storeLoading || city === 'all') return
+    if (!cities.some((name) => name.toLowerCase() === city.toLowerCase())) {
+      setCity('all')
+    }
+  }, [storeLoading, cities, city])
+
+  const visibleCampaigns = useMemo(
+    () => campaigns.filter((campaign) => campaignMatchesCity(campaign, city)),
+    [campaigns, city],
+  )
+
+  useEffect(() => {
+    if (storeLoading || activeId === 'all') return
+    if (!visibleCampaigns.some((campaign) => campaign.id === activeId)) {
+      setActiveId('all')
+    }
+  }, [storeLoading, visibleCampaigns, activeId])
+
   const visibleReviews = useMemo(
     () =>
-      filterReviews(reviews, campaigns, {
+      filterReviews(reviews, visibleCampaigns, {
         query,
         rating,
         sort,
@@ -136,12 +160,14 @@ export default function App() {
         fromDate,
         toDate,
       }),
-    [reviews, campaigns, query, rating, sort, timeRange, fromDate, toDate],
+    [reviews, visibleCampaigns, query, rating, sort, timeRange, fromDate, toDate],
   )
 
   const lastScrapedAt = useMemo(() => {
     const relevant =
-      activeId === 'all' ? campaigns : campaigns.filter((campaign) => campaign.id === activeId)
+      activeId === 'all'
+        ? visibleCampaigns
+        : visibleCampaigns.filter((campaign) => campaign.id === activeId)
     const timestamps = relevant
       .map((campaign) => campaign.lastScrapedAt)
       .filter((value): value is string => Boolean(value))
@@ -149,7 +175,7 @@ export default function App() {
       .filter((value) => !Number.isNaN(value))
     if (timestamps.length === 0) return undefined
     return new Date(Math.max(...timestamps))
-  }, [campaigns, activeId])
+  }, [visibleCampaigns, activeId])
 
   useEffect(() => {
     const root = feedRef.current
@@ -201,7 +227,7 @@ export default function App() {
       scroller.removeEventListener('scroll', onScroll)
       if (frame) window.cancelAnimationFrame(frame)
     }
-  }, [campaigns, visibleReviews])
+  }, [visibleCampaigns, visibleReviews])
 
   useEffect(() => {
     if (activeId === 'all') return
@@ -419,7 +445,7 @@ export default function App() {
   }
 
   function exportCsv() {
-    const csv = reviewsToCsv(visibleReviews, campaigns, {
+    const csv = reviewsToCsv(visibleReviews, visibleCampaigns, {
       timeRange,
       fromDate,
       toDate,
@@ -436,7 +462,7 @@ export default function App() {
   return (
     <div className="flex h-svh overflow-hidden bg-background">
       <CampaignSidebar
-        campaigns={campaigns}
+        campaigns={visibleCampaigns}
         selectedId={activeId}
         reviewCounts={reviewCounts}
         loading={storeLoading}
@@ -459,6 +485,8 @@ export default function App() {
             timeRange={timeRange}
             fromDate={fromDate}
             toDate={toDate}
+            city={city}
+            cities={cities}
             scraping={scraping}
             hasCampaigns={campaigns.length > 0}
             onQueryChange={setQuery}
@@ -467,6 +495,7 @@ export default function App() {
             onTimeRangeChange={setTimeRange}
             onFromDateChange={setFromDate}
             onToDateChange={setToDate}
+            onCityChange={setCity}
             onScrapeAll={() => void scrapeAll()}
             onExport={exportCsv}
           />
@@ -489,11 +518,12 @@ export default function App() {
             </div>
           ) : null}
           <ReviewFeed
-            campaigns={campaigns}
+            campaigns={visibleCampaigns}
             reviews={visibleReviews}
             activeId={activeId}
             sort={sort}
             loading={storeLoading}
+            emptyMessage={city === 'all' ? undefined : 'Try another city or choose All cities.'}
           />
         </div>
       </main>
