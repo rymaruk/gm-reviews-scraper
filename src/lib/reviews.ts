@@ -155,35 +155,41 @@ export function reviewsToCsv(
   for (const campaign of campaigns) {
     const name = campaignDisplayName(campaign)
     const address = campaign.address ?? ''
-    const generalRating =
-      campaign.rating != null ? formatCampaignRating(campaign.rating) : ''
+    const generalRating = campaign.rating != null && Number.isFinite(campaign.rating) ? campaign.rating : ''
     const campaignReviews = reviewsByCampaign.get(campaign.id) ?? []
 
     if (campaignReviews.length === 0) {
       rows.push(
-        [name, address, generalRating, '', '', '', '0 reviews', '', '', '']
-          .map(csvCell)
-          .join(','),
+        csvJoin([
+          csvCell(name),
+          csvCell(address),
+          csvNumber(generalRating),
+          csvCell(''),
+          csvCell(''),
+          csvCell(''),
+          csvCell('0 reviews'),
+          csvCell(''),
+          csvCell(''),
+          csvCell(''),
+        ]),
       )
       continue
     }
 
     for (const review of campaignReviews) {
       rows.push(
-        [
-          name,
-          address,
-          generalRating,
-          review.user.name,
-          review.rating,
-          review.isoDate ?? review.date ?? '',
-          review.snippet,
-          review.likes ?? 0,
-          review.source ?? '',
-          review.link ?? '',
-        ]
-          .map(csvCell)
-          .join(','),
+        csvJoin([
+          csvCell(name),
+          csvCell(address),
+          csvNumber(generalRating),
+          csvCell(review.user.name),
+          csvCell(review.rating),
+          csvCell(review.isoDate ?? review.date ?? ''),
+          csvCell(review.snippet),
+          csvCell(review.likes ?? 0),
+          csvCell(review.source ?? ''),
+          csvCell(review.link ?? ''),
+        ]),
       )
     }
   }
@@ -220,6 +226,15 @@ function formatPeriodDate(timestamp: number): string {
     month: 'short',
     year: 'numeric',
   })
+}
+
+function csvJoin(cells: string[]): string {
+  return cells.join(',')
+}
+
+function csvNumber(value: number | ''): string {
+  if (value === '') return ''
+  return String(value)
 }
 
 function csvCell(value: string | number): string {

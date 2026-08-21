@@ -143,7 +143,10 @@ export function CampaignSidebar({
                         {campaign.rating != null ? (
                           <>
                             <Stars rating={campaign.rating} />
-                            <span className="tabular-nums">{formatCampaignRating(campaign.rating)}</span>
+                            <span className="tabular-nums text-amber-400">
+                              {formatCampaignRating(campaign.rating)}
+                            </span>
+                            <span className="h-3 w-px shrink-0 bg-border" aria-hidden="true" />
                           </>
                         ) : null}
                         <span>{reviewCounts[campaign.id] ?? 0} reviews</span>
