@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { MapPinIcon, PlusIcon, RefreshCwIcon, SearchIcon, Trash2Icon } from 'lucide-react'
+import { ArrowDownWideNarrowIcon, ArrowUpNarrowWideIcon, MapPinIcon, PlusIcon, RefreshCwIcon, SearchIcon, Trash2Icon } from 'lucide-react'
 
 import { Stars } from '@/components/stars'
 import { Badge } from '@/components/ui/badge'
@@ -15,17 +15,20 @@ import {
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { campaignDisplayName, cityFromAddress, groupCampaignsByCity } from '@/lib/place'
 import { formatCampaignRating } from '@/lib/reviews'
-import type { Campaign } from '@/lib/types'
+import type { Campaign, CompanySort } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 export function CampaignSidebar({
   campaigns,
   selectedId,
   reviewCounts,
+  companySort,
   loading = false,
   onSelect,
+  onCompanySortChange,
   onAdd,
   onScrape,
   onRemove,
@@ -33,8 +36,10 @@ export function CampaignSidebar({
   campaigns: Campaign[]
   selectedId: string
   reviewCounts: Record<string, number>
+  companySort: CompanySort
   loading?: boolean
   onSelect: (id: string) => void
+  onCompanySortChange: (value: CompanySort) => void
   onAdd: () => void
   onScrape: (campaign: Campaign) => void
   onRemove: (campaign: Campaign) => void | Promise<void>
@@ -53,8 +58,8 @@ export function CampaignSidebar({
           const city = cityFromAddress(campaign.address)?.toLowerCase() ?? ''
           return name.includes(query) || address.includes(query) || city.includes(query)
         })
-    return groupCampaignsByCity(matched)
-  }, [campaigns, search])
+    return groupCampaignsByCity(matched, companySort)
+  }, [campaigns, search, companySort])
 
   async function confirmRemove() {
     if (!pendingRemoval) return
@@ -71,10 +76,38 @@ export function CampaignSidebar({
     <aside className="flex h-full w-80 shrink-0 flex-col border-r bg-sidebar">
       <div className="flex items-center justify-between gap-2 px-4 py-4">
         <h1 className="font-heading text-lg font-medium">GoogleMap Review</h1>
-        <Button size="sm" onClick={onAdd}>
-          <PlusIcon />
-          Add
-        </Button>
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="outline"
+                onClick={() =>
+                  onCompanySortChange(companySort === 'rating-desc' ? 'rating-asc' : 'rating-desc')
+                }
+                aria-label={
+                  companySort === 'rating-desc'
+                    ? 'Sort companies by rating, lowest first'
+                    : 'Sort companies by rating, highest first'
+                }
+              >
+                {companySort === 'rating-desc' ? (
+                  <ArrowDownWideNarrowIcon />
+                ) : (
+                  <ArrowUpNarrowWideIcon />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {companySort === 'rating-desc' ? 'Rating: high to low' : 'Rating: low to high'}
+            </TooltipContent>
+          </Tooltip>
+          <Button size="sm" onClick={onAdd}>
+            <PlusIcon />
+            Add
+          </Button>
+        </div>
       </div>
 
       <div className="px-3 pb-3">

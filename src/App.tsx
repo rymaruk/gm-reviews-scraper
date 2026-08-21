@@ -18,10 +18,10 @@ import {
   patchCampaign,
   resolvePlace,
 } from '@/lib/api'
-import { campaignCities, campaignDisplayName, campaignMatchesCity, placeNameFromMapsUrl, preferName } from '@/lib/place'
+import { campaignCities, campaignDisplayName, campaignMatchesCity, placeNameFromMapsUrl, preferName, sortCampaignsByRating } from '@/lib/place'
 import { filterReviews, mergeReviews, reviewsToCsv } from '@/lib/reviews'
 import { readFilterParams, writeFilterParams } from '@/lib/search-params'
-import type { Campaign, RatingFilter, SortOption, StoredReview, TimeRange } from '@/lib/types'
+import type { Campaign, CompanySort, RatingFilter, SortOption, StoredReview, TimeRange } from '@/lib/types'
 
 const MAX_PAGES = 25
 const initialFilters = readFilterParams()
@@ -33,6 +33,7 @@ export default function App() {
   const [query, setQuery] = useState(initialFilters.query)
   const [rating, setRating] = useState<RatingFilter>(initialFilters.rating)
   const [sort, setSort] = useState<SortOption>(initialFilters.sort)
+  const [companySort, setCompanySort] = useState<CompanySort>(initialFilters.companySort)
   const [timeRange, setTimeRange] = useState<TimeRange>(initialFilters.timeRange)
   const [fromDate, setFromDate] = useState(initialFilters.fromDate)
   const [toDate, setToDate] = useState(initialFilters.toDate)
@@ -84,13 +85,14 @@ export default function App() {
       query,
       rating,
       sort,
+      companySort,
       timeRange,
       fromDate,
       toDate,
       company: activeId,
       city,
     })
-  }, [query, rating, sort, timeRange, fromDate, toDate, activeId, city])
+  }, [query, rating, sort, companySort, timeRange, fromDate, toDate, activeId, city])
 
   useEffect(() => {
     function onPopState() {
@@ -98,6 +100,7 @@ export default function App() {
       setQuery(next.query)
       setRating(next.rating)
       setSort(next.sort)
+      setCompanySort(next.companySort)
       setTimeRange(next.timeRange)
       setFromDate(next.fromDate)
       setToDate(next.toDate)
@@ -139,8 +142,12 @@ export default function App() {
   }, [storeLoading, cities, city])
 
   const visibleCampaigns = useMemo(
-    () => campaigns.filter((campaign) => campaignMatchesCity(campaign, city)),
-    [campaigns, city],
+    () =>
+      sortCampaignsByRating(
+        campaigns.filter((campaign) => campaignMatchesCity(campaign, city)),
+        companySort,
+      ),
+    [campaigns, city, companySort],
   )
 
   useEffect(() => {
@@ -465,8 +472,10 @@ export default function App() {
         campaigns={visibleCampaigns}
         selectedId={activeId}
         reviewCounts={reviewCounts}
+        companySort={companySort}
         loading={storeLoading}
         onSelect={selectCompany}
+        onCompanySortChange={setCompanySort}
         onAdd={() => setDialogOpen(true)}
         onScrape={(campaign) => void scrapeCampaign(campaign, { reset: true })}
         onRemove={removeCampaign}

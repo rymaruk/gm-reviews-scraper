@@ -1,4 +1,4 @@
-import type { Campaign } from './types.js'
+import type { Campaign, CompanySort } from './types.js'
 
 const PLACEHOLDER_NAMES = new Set(['unknown place', 'unknown campaign', 'unknown'])
 
@@ -136,6 +136,7 @@ export function campaignCities(campaigns: Array<Pick<Campaign, 'address'>>): str
 
 export function groupCampaignsByCity(
   campaigns: Campaign[],
+  companySort: CompanySort = 'rating-desc',
 ): Array<{ city: string; campaigns: Campaign[] }> {
   const groups = new Map<string, { city: string; campaigns: Campaign[] }>()
   const unknown: Campaign[] = []
@@ -153,21 +154,53 @@ export function groupCampaignsByCity(
     else groups.set(key, { city, campaigns: [campaign] })
   }
 
-  const sorted = [...groups.values()].sort((left, right) => left.city.localeCompare(right.city))
-  for (const group of sorted) {
-    group.campaigns.sort((left, right) =>
-      campaignDisplayName(left).localeCompare(campaignDisplayName(right)),
-    )
+  for (const group of groups.values()) {
+    group.campaigns.sort((left, right) => compareCampaignsByRating(left, right, companySort))
   }
 
+  const sorted = [...groups.values()].sort((left, right) => {
+    const ratingCmp = compareCampaignsByRating(left.campaigns[0], right.campaigns[0], companySort)
+    if (ratingCmp !== 0) return ratingCmp
+    return left.city.localeCompare(right.city)
+  })
+
   if (unknown.length > 0) {
-    unknown.sort((left, right) =>
-      campaignDisplayName(left).localeCompare(campaignDisplayName(right)),
-    )
+    unknown.sort((left, right) => compareCampaignsByRating(left, right, companySort))
     sorted.push({ city: 'Unknown city', campaigns: unknown })
   }
 
   return sorted
+}
+
+export function sortCampaignsByRating(campaigns: Campaign[], companySort: CompanySort): Campaign[] {
+  return [...campaigns].sort((left, right) => compareCampaignsByRating(left, right, companySort))
+}
+
+export function compareCampaignsByRating(
+  left: Campaign | undefined,
+  right: Campaign | undefined,
+  companySort: CompanySort,
+): number {
+  if (!left && !right) return 0
+  if (!left) return 1
+  if (!right) return -1
+
+  const leftRating = campaignRating(left)
+  const rightRating = campaignRating(right)
+  if (leftRating == null && rightRating == null) {
+    return campaignDisplayName(left).localeCompare(campaignDisplayName(right))
+  }
+  if (leftRating == null) return 1
+  if (rightRating == null) return -1
+
+  const diff =
+    companySort === 'rating-asc' ? leftRating - rightRating : rightRating - leftRating
+  if (diff !== 0) return diff
+  return campaignDisplayName(left).localeCompare(campaignDisplayName(right))
+}
+
+function campaignRating(campaign: Campaign): number | undefined {
+  return campaign.rating != null && Number.isFinite(campaign.rating) ? campaign.rating : undefined
 }
 
 export function campaignMatchesCity(campaign: Pick<Campaign, 'address'>, city: string): boolean {

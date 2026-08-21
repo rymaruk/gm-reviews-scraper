@@ -1,4 +1,4 @@
-import type { RatingFilter, SortOption, TimeRange } from '@/lib/types'
+import type { CompanySort, RatingFilter, SortOption, TimeRange } from '@/lib/types'
 
 const RATINGS = new Set<RatingFilter>(['all', '5', '4', '3', '2', '1'])
 const SORTS = new Set<SortOption>(['newest', 'oldest'])
@@ -8,6 +8,7 @@ export type FilterParams = {
   query: string
   rating: RatingFilter
   sort: SortOption
+  companySort: CompanySort
   timeRange: TimeRange
   fromDate: string
   toDate: string
@@ -19,6 +20,7 @@ export const defaultFilterParams: FilterParams = {
   query: '',
   rating: 'all',
   sort: 'newest',
+  companySort: 'rating-desc',
   timeRange: 'all',
   fromDate: '',
   toDate: '',
@@ -33,11 +35,13 @@ export function readFilterParams(search = window.location.search): FilterParams 
   const range = params.get('range')
   const company = params.get('company')?.trim()
   const city = params.get('city')?.trim()
+  const companySort = params.get('csort')
 
   return {
     query: params.get('q')?.trim() ?? '',
     rating: isRating(rating) ? rating : 'all',
     sort: isSort(sort) ? sort : 'newest',
+    companySort: parseCompanySort(companySort),
     timeRange: isRange(range) ? range : 'all',
     fromDate: params.get('from')?.trim() ?? '',
     toDate: params.get('to')?.trim() ?? '',
@@ -52,6 +56,7 @@ export function writeFilterParams(filters: FilterParams): void {
   if (filters.query) params.set('q', filters.query)
   if (filters.rating !== 'all') params.set('rating', filters.rating)
   if (filters.sort !== 'newest') params.set('sort', filters.sort)
+  if (filters.companySort === 'rating-asc') params.set('csort', 'asc')
   if (filters.timeRange !== 'all') params.set('range', filters.timeRange)
   if (filters.timeRange === 'custom' && filters.fromDate) params.set('from', filters.fromDate)
   if (filters.timeRange === 'custom' && filters.toDate) params.set('to', filters.toDate)
@@ -72,6 +77,11 @@ function isRating(value: string | null): value is RatingFilter {
 
 function isSort(value: string | null): value is SortOption {
   return value != null && SORTS.has(value as SortOption)
+}
+
+function parseCompanySort(value: string | null): CompanySort {
+  if (value === 'asc' || value === 'rating-asc') return 'rating-asc'
+  return 'rating-desc'
 }
 
 function isRange(value: string | null): value is TimeRange {

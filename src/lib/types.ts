@@ -61,5 +61,6 @@ export type ReviewsPage = {
 
 export type RatingFilter = 'all' | '5' | '4' | '3' | '2' | '1'
 export type SortOption = 'newest' | 'oldest'
+export type CompanySort = 'rating-desc' | 'rating-asc'
 export type TimeRange = 'all' | '7d' | '30d' | '90d' | '365d' | 'custom'
 export type CampaignFilter = 'all' | string
