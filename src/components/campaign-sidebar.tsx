@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
-import { campaignDisplayName } from '@/lib/place'
+import { campaignDisplayName, cityFromAddress, groupCampaignsByCity } from '@/lib/place'
 import { formatCampaignRating } from '@/lib/reviews'
 import type { Campaign } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -43,14 +43,17 @@ export function CampaignSidebar({
   const [pendingRemoval, setPendingRemoval] = useState<Campaign | null>(null)
   const [removing, setRemoving] = useState(false)
   const totalReviews = campaigns.reduce((sum, campaign) => sum + (reviewCounts[campaign.id] ?? 0), 0)
-  const visibleCampaigns = useMemo(() => {
+  const groupedCampaigns = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return campaigns
-    return campaigns.filter((campaign) => {
-      const name = campaignDisplayName(campaign).toLowerCase()
-      const address = (campaign.address ?? '').toLowerCase()
-      return name.includes(query) || address.includes(query)
-    })
+    const matched = !query
+      ? campaigns
+      : campaigns.filter((campaign) => {
+          const name = campaignDisplayName(campaign).toLowerCase()
+          const address = (campaign.address ?? '').toLowerCase()
+          const city = cityFromAddress(campaign.address)?.toLowerCase() ?? ''
+          return name.includes(query) || address.includes(query) || city.includes(query)
+        })
+    return groupCampaignsByCity(matched)
   }, [campaigns, search])
 
   async function confirmRemove() {
@@ -109,80 +112,89 @@ export function CampaignSidebar({
             <div className="rounded-xl border border-dashed px-3 py-8 text-center text-sm text-muted-foreground">
               Add a Google Maps shop link to start collecting reviews.
             </div>
-          ) : visibleCampaigns.length === 0 ? (
+          ) : groupedCampaigns.length === 0 ? (
             <div className="rounded-xl border border-dashed px-3 py-8 text-center text-sm text-muted-foreground">
               No companies match that search.
             </div>
           ) : (
-            visibleCampaigns.map((campaign) => {
-              const active = selectedId === campaign.id
-              const name = campaignDisplayName(campaign)
-              return (
-                <div
-                  key={campaign.id}
-                  data-campaign-id={campaign.id}
-                  className={cn(
-                    'flex min-w-full flex-col rounded-xl px-3 py-3 transition-colors',
-                    active ? 'bg-background shadow-sm ring-1 ring-foreground/10' : 'hover:bg-background/70',
-                  )}
-                >
-                  <button
-                    type="button"
-                    className="flex w-full items-start gap-3 text-left"
-                    onClick={() => onSelect(campaign.id)}
-                  >
-                    <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <MapPinIcon className="size-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-medium break-all whitespace-normal">{name}</span>
-                      <span className="mt-0.5 block text-xs break-all whitespace-normal text-muted-foreground">
-                        {campaign.address ?? campaign.type ?? 'Google Maps place'}
-                      </span>
-                      <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                        {campaign.rating != null ? (
-                          <>
-                            <Stars rating={campaign.rating} />
-                            <span className="tabular-nums text-amber-400">
-                              {formatCampaignRating(campaign.rating)}
-                            </span>
-                            <span className="h-3 w-px shrink-0 bg-border" aria-hidden="true" />
-                          </>
-                        ) : null}
-                        <span>{reviewCounts[campaign.id] ?? 0} reviews</span>
-                      </span>
-                    </span>
-                  </button>
-                  <div className="mt-2 flex items-center justify-end gap-1">
-                    {campaign.scrapeStatus === 'scraping' && (
-                      <Badge variant="outline">Scraping…</Badge>
-                    )}
-                    {campaign.scrapeStatus === 'error' && (
-                      <Badge variant="destructive">Failed</Badge>
-                    )}
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      onClick={() => onScrape(campaign)}
-                      disabled={campaign.scrapeStatus === 'scraping'}
-                      aria-label={`Scrape reviews for ${name}`}
+            groupedCampaigns.map((group) => (
+              <section key={group.city} className="flex flex-col gap-1">
+                <h2 className="px-3 pt-2 pb-1 text-xs font-medium tracking-wide text-muted-foreground">
+                  {group.city} ({group.campaigns.length})
+                </h2>
+                {group.campaigns.map((campaign) => {
+                  const active = selectedId === campaign.id
+                  const name = campaignDisplayName(campaign)
+                  return (
+                    <div
+                      key={campaign.id}
+                      data-campaign-id={campaign.id}
+                      className={cn(
+                        'flex min-w-full flex-col rounded-xl px-3 py-3 transition-colors',
+                        active
+                          ? 'bg-background shadow-sm ring-1 ring-foreground/10'
+                          : 'hover:bg-background/70',
+                      )}
                     >
-                      <RefreshCwIcon />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      onClick={() => setPendingRemoval(campaign)}
-                      aria-label={`Remove ${name}`}
-                    >
-                      <Trash2Icon />
-                    </Button>
-                  </div>
-                </div>
-              )
-            })
+                      <button
+                        type="button"
+                        className="flex w-full items-start gap-3 text-left"
+                        onClick={() => onSelect(campaign.id)}
+                      >
+                        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                          <MapPinIcon className="size-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-medium break-all whitespace-normal">{name}</span>
+                          <span className="mt-0.5 block text-xs break-all whitespace-normal text-muted-foreground">
+                            {campaign.address ?? campaign.type ?? 'Google Maps place'}
+                          </span>
+                          <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                            {campaign.rating != null ? (
+                              <>
+                                <Stars rating={campaign.rating} />
+                                <span className="tabular-nums text-amber-400">
+                                  {formatCampaignRating(campaign.rating)}
+                                </span>
+                                <span className="h-3 w-px shrink-0 bg-border" aria-hidden="true" />
+                              </>
+                            ) : null}
+                            <span>{reviewCounts[campaign.id] ?? 0} reviews</span>
+                          </span>
+                        </span>
+                      </button>
+                      <div className="mt-2 flex items-center justify-end gap-1">
+                        {campaign.scrapeStatus === 'scraping' && (
+                          <Badge variant="outline">Scraping…</Badge>
+                        )}
+                        {campaign.scrapeStatus === 'error' && (
+                          <Badge variant="destructive">Failed</Badge>
+                        )}
+                        <Button
+                          type="button"
+                          size="icon-sm"
+                          variant="ghost"
+                          onClick={() => onScrape(campaign)}
+                          disabled={campaign.scrapeStatus === 'scraping'}
+                          aria-label={`Scrape reviews for ${name}`}
+                        >
+                          <RefreshCwIcon />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon-sm"
+                          variant="ghost"
+                          onClick={() => setPendingRemoval(campaign)}
+                          aria-label={`Remove ${name}`}
+                        >
+                          <Trash2Icon />
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </section>
+            ))
           )}
         </div>
       </ScrollArea>

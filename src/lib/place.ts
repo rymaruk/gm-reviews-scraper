@@ -134,6 +134,42 @@ export function campaignCities(campaigns: Array<Pick<Campaign, 'address'>>): str
   return cities.sort((left, right) => left.localeCompare(right))
 }
 
+export function groupCampaignsByCity(
+  campaigns: Campaign[],
+): Array<{ city: string; campaigns: Campaign[] }> {
+  const groups = new Map<string, { city: string; campaigns: Campaign[] }>()
+  const unknown: Campaign[] = []
+
+  for (const campaign of campaigns) {
+    const city = cityFromAddress(campaign.address)
+    if (!city) {
+      unknown.push(campaign)
+      continue
+    }
+
+    const key = city.toLowerCase()
+    const existing = groups.get(key)
+    if (existing) existing.campaigns.push(campaign)
+    else groups.set(key, { city, campaigns: [campaign] })
+  }
+
+  const sorted = [...groups.values()].sort((left, right) => left.city.localeCompare(right.city))
+  for (const group of sorted) {
+    group.campaigns.sort((left, right) =>
+      campaignDisplayName(left).localeCompare(campaignDisplayName(right)),
+    )
+  }
+
+  if (unknown.length > 0) {
+    unknown.sort((left, right) =>
+      campaignDisplayName(left).localeCompare(campaignDisplayName(right)),
+    )
+    sorted.push({ city: 'Unknown city', campaigns: unknown })
+  }
+
+  return sorted
+}
+
 export function campaignMatchesCity(campaign: Pick<Campaign, 'address'>, city: string): boolean {
   if (!city || city === 'all') return true
   return cityFromAddress(campaign.address)?.toLowerCase() === city.toLowerCase()
