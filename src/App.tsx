@@ -527,6 +527,7 @@ export default function App() {
             </div>
           ) : null}
           <ReviewFeed
+            key={`${query}|${rating}|${sort}|${companySort}|${timeRange}|${fromDate}|${toDate}|${city}`}
             campaigns={visibleCampaigns}
             reviews={visibleReviews}
             activeId={activeId}

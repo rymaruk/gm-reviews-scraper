@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapPinIcon } from 'lucide-react'
 
 import { ReviewCard } from '@/components/review-card'
@@ -7,6 +8,9 @@ import { campaignDisplayName } from '@/lib/place'
 import { groupReviewsByCompany, groupReviewsByDay } from '@/lib/reviews'
 import type { Campaign, SortOption, StoredReview } from '@/lib/types'
 import { cn } from '@/lib/utils'
+
+const INITIAL_VISIBLE_REVIEWS = 40
+const LOAD_MORE_REVIEWS = 40
 
 export function ReviewFeed({
   campaigns,
@@ -23,6 +27,52 @@ export function ReviewFeed({
   loading?: boolean
   emptyMessage?: string
 }) {
+  const [loadedLimit, setLoadedLimit] = useState(INITIAL_VISIBLE_REVIEWS)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  const groups = useMemo(() => groupReviewsByCompany(campaigns, reviews), [campaigns, reviews])
+  const totalReviews = reviews.length
+
+  const activeNeeded = useMemo(() => {
+    if (activeId === 'all') return 0
+    let needed = 0
+    for (const group of groups) {
+      needed += group.reviews.length
+      if (group.campaign.id === activeId) return needed
+    }
+    return 0
+  }, [activeId, groups])
+
+  if (activeNeeded > loadedLimit) {
+    setLoadedLimit(activeNeeded)
+  }
+
+  const visibleLimit = Math.max(loadedLimit, activeNeeded, INITIAL_VISIBLE_REVIEWS)
+
+  const { visibleGroups, hasMore } = useMemo(
+    () => sliceGroupsByReviewLimit(groups, visibleLimit),
+    [groups, visibleLimit],
+  )
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel || !hasMore) return
+
+    const root = findScrollParent(sentinel)
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return
+        setLoadedLimit((current) =>
+          Math.min(current + LOAD_MORE_REVIEWS, Math.max(totalReviews, current)),
+        )
+      },
+      { root, rootMargin: '320px 0px' },
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, totalReviews, visibleGroups.length])
+
   if (loading) {
     return <ReviewFeedSkeleton />
   }
@@ -42,11 +92,9 @@ export function ReviewFeed({
     )
   }
 
-  const groups = groupReviewsByCompany(campaigns, reviews)
-
   return (
     <div className="flex flex-col gap-10 p-4 pb-24">
-      {groups.map(({ campaign, reviews: companyReviews }) => {
+      {visibleGroups.map(({ campaign, reviews: companyReviews, totalCount }) => {
         const name = campaignDisplayName(campaign)
         const days = groupReviewsByDay(companyReviews, sort)
 
@@ -75,7 +123,7 @@ export function ReviewFeed({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <h2 className="font-heading text-xl font-medium">{name}</h2>
-                    <Badge variant="secondary">{companyReviews.length}</Badge>
+                    <Badge variant="secondary">{totalCount}</Badge>
                   </div>
                   {campaign.mapsUrl ? (
                     <a
@@ -95,7 +143,7 @@ export function ReviewFeed({
               </div>
             </header>
 
-            {companyReviews.length === 0 ? (
+            {totalCount === 0 ? (
               <p className="text-sm text-muted-foreground">No reviews in this time range.</p>
             ) : (
               <div className="flex flex-col gap-6">
@@ -114,8 +162,67 @@ export function ReviewFeed({
           </section>
         )
       })}
+
+      {hasMore ? (
+        <div ref={sentinelRef} className="flex flex-col gap-3" aria-hidden>
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </div>
+      ) : null}
     </div>
   )
+}
+
+function sliceGroupsByReviewLimit(
+  groups: Array<{ campaign: Campaign; reviews: StoredReview[] }>,
+  limit: number,
+): {
+  visibleGroups: Array<{ campaign: Campaign; reviews: StoredReview[]; totalCount: number }>
+  hasMore: boolean
+} {
+  let remaining = limit
+  const visibleGroups: Array<{ campaign: Campaign; reviews: StoredReview[]; totalCount: number }> =
+    []
+
+  for (const group of groups) {
+    const totalCount = group.reviews.length
+
+    if (totalCount === 0) {
+      visibleGroups.push({ ...group, totalCount })
+      continue
+    }
+
+    if (remaining <= 0) {
+      return { visibleGroups, hasMore: true }
+    }
+
+    if (totalCount <= remaining) {
+      visibleGroups.push({ ...group, totalCount })
+      remaining -= totalCount
+      continue
+    }
+
+    visibleGroups.push({
+      campaign: group.campaign,
+      reviews: group.reviews.slice(0, remaining),
+      totalCount,
+    })
+    return { visibleGroups, hasMore: true }
+  }
+
+  return { visibleGroups, hasMore: false }
+}
+
+function findScrollParent(node: HTMLElement): Element | null {
+  let current: HTMLElement | null = node.parentElement
+  while (current) {
+    const { overflowY } = window.getComputedStyle(current)
+    if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') {
+      return current
+    }
+    current = current.parentElement
+  }
+  return null
 }
 
 function ReviewFeedSkeleton() {
