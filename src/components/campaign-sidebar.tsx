@@ -48,6 +48,7 @@ export function CampaignSidebar({
   const [pendingRemoval, setPendingRemoval] = useState<Campaign | null>(null)
   const [removing, setRemoving] = useState(false)
   const totalReviews = campaigns.reduce((sum, campaign) => sum + (reviewCounts[campaign.id] ?? 0), 0)
+  const ratingMetrics = useMemo(() => campaignRatingMetrics(campaigns), [campaigns])
   const groupedCampaigns = useMemo(() => {
     const query = search.trim().toLowerCase()
     const matched = !query
@@ -136,6 +137,30 @@ export function CampaignSidebar({
           <Badge variant="secondary">{totalReviews}</Badge>
         </button>
       </div>
+
+      {loading ? (
+        <div className="grid grid-cols-2 gap-2 px-3 pb-3">
+          {Array.from({ length: 4 }, (_, index) => (
+            <Skeleton key={index} className="h-[58px] rounded-xl" />
+          ))}
+        </div>
+      ) : campaigns.length > 0 ? (
+        <div className="grid grid-cols-2 gap-2 px-3 pb-3">
+          <MetricTile label="Campaigns" value={String(ratingMetrics.count)} />
+          <MetricTile
+            label="Avg rating"
+            value={ratingMetrics.average != null ? formatCampaignRating(ratingMetrics.average) : '—'}
+          />
+          <MetricTile
+            label="Min rating"
+            value={ratingMetrics.min != null ? formatCampaignRating(ratingMetrics.min) : '—'}
+          />
+          <MetricTile
+            label="Max rating"
+            value={ratingMetrics.max != null ? formatCampaignRating(ratingMetrics.max) : '—'}
+          />
+        </div>
+      ) : null}
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-3 px-3 pb-4">
@@ -259,6 +284,38 @@ export function CampaignSidebar({
       </Dialog>
     </aside>
   )
+}
+
+function MetricTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-background/70 px-3 py-2 ring-1 ring-foreground/5">
+      <p className="text-[11px] tracking-wide text-muted-foreground uppercase">{label}</p>
+      <p className="mt-0.5 font-heading text-lg font-medium tabular-nums">{value}</p>
+    </div>
+  )
+}
+
+function campaignRatingMetrics(campaigns: Campaign[]): {
+  count: number
+  average: number | null
+  min: number | null
+  max: number | null
+} {
+  const ratings = campaigns
+    .map((campaign) => campaign.rating)
+    .filter((rating): rating is number => rating != null && Number.isFinite(rating))
+
+  if (ratings.length === 0) {
+    return { count: campaigns.length, average: null, min: null, max: null }
+  }
+
+  const sum = ratings.reduce((total, rating) => total + rating, 0)
+  return {
+    count: campaigns.length,
+    average: sum / ratings.length,
+    min: Math.min(...ratings),
+    max: Math.max(...ratings),
+  }
 }
 
 function SidebarListSkeleton() {
