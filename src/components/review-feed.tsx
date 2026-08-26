@@ -1,16 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { MapPinIcon } from 'lucide-react'
 
 import { ReviewCard } from '@/components/review-card'
-import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { campaignDisplayName } from '@/lib/place'
-import { groupReviewsByCompany, groupReviewsByDay } from '@/lib/reviews'
+import { formatCampaignRating, groupReviewsByCompany, groupReviewsByDay } from '@/lib/reviews'
 import type { Campaign, SortOption, StoredReview } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-const INITIAL_VISIBLE_REVIEWS = 20
-const LOAD_MORE_REVIEWS = 20
+const INITIAL_VISIBLE_REVIEWS = 5
 
 export function ReviewFeed({
   campaigns,
@@ -76,29 +75,17 @@ function CampaignSection({
 }) {
   const name = campaignDisplayName(campaign)
   const [visibleLimit, setVisibleLimit] = useState(INITIAL_VISIBLE_REVIEWS)
-  const sentinelRef = useRef<HTMLDivElement>(null)
-  const hasMore = visibleLimit < reviews.length
+  const remaining = Math.max(0, reviews.length - visibleLimit)
+  const hasMore = remaining > 0
   const days = useMemo(
     () => groupReviewsByDay(reviews.slice(0, visibleLimit), sort),
     [reviews, visibleLimit, sort],
   )
-
-  useEffect(() => {
-    const sentinel = sentinelRef.current
-    if (!sentinel || !hasMore) return
-
-    const root = findScrollParent(sentinel)
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return
-        setVisibleLimit((current) => Math.min(current + LOAD_MORE_REVIEWS, reviews.length))
-      },
-      { root, rootMargin: '240px 0px' },
-    )
-
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [hasMore, reviews.length, visibleLimit])
+  const reviewsLabel = campaign.reviewsCount ?? reviews.length
+  const ratingLabel =
+    campaign.rating != null && Number.isFinite(campaign.rating)
+      ? formatCampaignRating(campaign.rating)
+      : '—'
 
   return (
     <section
@@ -122,10 +109,10 @@ function CampaignSection({
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <h2 className="font-heading text-xl font-medium">{name}</h2>
-              <Badge variant="secondary">{reviews.length}</Badge>
-            </div>
+            <h2 className="font-heading text-xl font-medium">{name}</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Reviews: {reviewsLabel}, Rating: {ratingLabel}
+            </p>
             {campaign.mapsUrl ? (
               <a
                 href={campaign.mapsUrl}
@@ -159,27 +146,19 @@ function CampaignSection({
             </div>
           ))}
           {hasMore ? (
-            <div ref={sentinelRef} className="flex flex-col gap-3" aria-hidden>
-              <Skeleton className="h-24 w-full rounded-xl" />
-              <Skeleton className="h-24 w-full rounded-xl" />
+            <div className="flex justify-center pt-1">
+              <Button
+                variant="outline"
+                onClick={() => setVisibleLimit(reviews.length)}
+              >
+                Show more {remaining} review{remaining === 1 ? '' : 's'}
+              </Button>
             </div>
           ) : null}
         </div>
       )}
     </section>
   )
-}
-
-function findScrollParent(node: HTMLElement): Element | null {
-  let current: HTMLElement | null = node.parentElement
-  while (current) {
-    const { overflowY } = window.getComputedStyle(current)
-    if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') {
-      return current
-    }
-    current = current.parentElement
-  }
-  return null
 }
 
 function ReviewFeedSkeleton() {
