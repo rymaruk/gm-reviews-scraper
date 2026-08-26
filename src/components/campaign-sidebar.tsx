@@ -1,5 +1,16 @@
-import { useMemo, useState } from 'react'
-import { ArrowDownWideNarrowIcon, ArrowUpNarrowWideIcon, MapPinIcon, PlusIcon, RefreshCwIcon, SearchIcon, Trash2Icon } from 'lucide-react'
+import { useMemo, useState, type ComponentType, type SVGProps } from 'react'
+import {
+  ArrowDownIcon,
+  ArrowDownWideNarrowIcon,
+  ArrowUpIcon,
+  ArrowUpNarrowWideIcon,
+  MapPinIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  SearchIcon,
+  StarIcon,
+  Trash2Icon,
+} from 'lucide-react'
 
 import { Stars } from '@/components/stars'
 import { Badge } from '@/components/ui/badge'
@@ -76,7 +87,7 @@ export function CampaignSidebar({
   return (
     <aside className="flex h-full w-80 shrink-0 flex-col border-r bg-sidebar">
       <div className="flex items-center justify-between gap-2 px-4 py-4">
-        <h1 className="font-heading text-lg font-medium">GoogleMap Review</h1>
+        <h1 className="font-heading text-lg font-medium">GoogleMap Reviews</h1>
         <div className="flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -146,16 +157,20 @@ export function CampaignSidebar({
         </div>
       ) : campaigns.length > 0 ? (
         <div className="grid grid-cols-2 gap-2 px-3 pb-3">
-          <MetricTile label="Campaigns" value={String(ratingMetrics.count)} />
+          <MetricTile icon={MapPinIcon} label="Campaigns" value={String(ratingMetrics.count)} />
           <MetricTile
+            icon={StarIcon}
+            iconClassName="fill-amber-400 text-amber-400"
             label="Avg rating"
             value={ratingMetrics.average != null ? formatCampaignRating(ratingMetrics.average) : '—'}
           />
           <MetricTile
+            icon={ArrowDownIcon}
             label="Min rating"
             value={ratingMetrics.min != null ? formatCampaignRating(ratingMetrics.min) : '—'}
           />
           <MetricTile
+            icon={ArrowUpIcon}
             label="Max rating"
             value={ratingMetrics.max != null ? formatCampaignRating(ratingMetrics.max) : '—'}
           />
@@ -286,10 +301,23 @@ export function CampaignSidebar({
   )
 }
 
-function MetricTile({ label, value }: { label: string; value: string }) {
+function MetricTile({
+  label,
+  value,
+  icon: Icon,
+  iconClassName,
+}: {
+  label: string
+  value: string
+  icon: ComponentType<SVGProps<SVGSVGElement>>
+  iconClassName?: string
+}) {
   return (
     <div className="rounded-xl bg-background/70 px-3 py-2 ring-1 ring-foreground/5">
-      <p className="text-[11px] tracking-wide text-muted-foreground uppercase">{label}</p>
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        <Icon className={cn('size-3.5 shrink-0', iconClassName)} aria-hidden />
+        <p className="text-[11px] tracking-wide uppercase">{label}</p>
+      </div>
       <p className="mt-0.5 font-heading text-lg font-medium tabular-nums">{value}</p>
     </div>
   )

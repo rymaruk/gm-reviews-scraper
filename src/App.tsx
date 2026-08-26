@@ -18,7 +18,7 @@ import {
   patchCampaign,
   resolvePlace,
 } from '@/lib/api'
-import { campaignCities, campaignDisplayName, campaignMatchesCity, placeNameFromMapsUrl, preferName, sortCampaignsByRating } from '@/lib/place'
+import { campaignCities, campaignDisplayName, campaignMatchesCity, groupCampaignsByCity, placeNameFromMapsUrl, preferName } from '@/lib/place'
 import { filterReviews, mergeReviews, reviewsToCsv } from '@/lib/reviews'
 import { readFilterParams, writeFilterParams } from '@/lib/search-params'
 import type { Campaign, CompanySort, RatingFilter, SortOption, StoredReview, TimeRange } from '@/lib/types'
@@ -143,10 +143,10 @@ export default function App() {
 
   const visibleCampaigns = useMemo(
     () =>
-      sortCampaignsByRating(
+      groupCampaignsByCity(
         campaigns.filter((campaign) => campaignMatchesCity(campaign, city)),
         companySort,
-      ),
+      ).flatMap((group) => group.campaigns),
     [campaigns, city, companySort],
   )
 
@@ -250,16 +250,16 @@ export default function App() {
     setActiveId(id)
     window.setTimeout(() => {
       if (scrollingToRef.current === id) scrollingToRef.current = null
-    }, 800)
+    }, 200)
 
     if (id === 'all') {
-      feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+      feedRef.current?.scrollTo({ top: 0, behavior: 'auto' })
       return
     }
 
     window.requestAnimationFrame(() => {
       document.getElementById(`company-${id}`)?.scrollIntoView({
-        behavior: 'smooth',
+        behavior: 'auto',
         block: 'start',
       })
     })
