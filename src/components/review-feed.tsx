@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { MapPinIcon, MessageSquareTextIcon, StarIcon } from 'lucide-react'
+import { MapPinIcon, MessageSquareTextIcon } from 'lucide-react'
 
 import { ReviewCard } from '@/components/review-card'
+import { Stars } from '@/components/stars'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { campaignDisplayName } from '@/lib/place'
@@ -116,10 +117,14 @@ function CampaignSection({
                   <MessageSquareTextIcon className="size-3.5" aria-hidden />
                   Reviews: {reviewsLabel}
                 </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <StarIcon className="size-3.5 fill-amber-400 text-amber-400" aria-hidden />
-                  Rating: {ratingLabel}
-                </span>
+                {campaign.rating != null && Number.isFinite(campaign.rating) ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Stars rating={campaign.rating} />
+                    <span className="tabular-nums text-amber-400">{ratingLabel}</span>
+                  </span>
+                ) : (
+                  <span>Rating: —</span>
+                )}
               </p>
             </div>
             {campaign.mapsUrl ? (
