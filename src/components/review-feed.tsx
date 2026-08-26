@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { MapPinIcon } from 'lucide-react'
+import { MapPinIcon, MessageSquareTextIcon, StarIcon } from 'lucide-react'
 
 import { ReviewCard } from '@/components/review-card'
 import { Button } from '@/components/ui/button'
@@ -109,10 +109,19 @@ function CampaignSection({
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <h2 className="font-heading text-xl font-medium">{name}</h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Reviews: {reviewsLabel}, Rating: {ratingLabel}
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+              <h2 className="min-w-0 font-heading text-xl font-medium">{name}</h2>
+              <p className="flex shrink-0 flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <MessageSquareTextIcon className="size-3.5" aria-hidden />
+                  Reviews: {reviewsLabel}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <StarIcon className="size-3.5 fill-amber-400 text-amber-400" aria-hidden />
+                  Rating: {ratingLabel}
+                </span>
+              </p>
+            </div>
             {campaign.mapsUrl ? (
               <a
                 href={campaign.mapsUrl}
