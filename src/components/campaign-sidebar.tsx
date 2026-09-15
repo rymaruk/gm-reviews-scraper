@@ -31,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { campaignDisplayName, cityFromAddress, groupCampaignsByCity } from '@/lib/place'
 import { formatCampaignRating } from '@/lib/reviews'
+import { formatScrapedAt, scrapeLimitMessage, wasScrapedToday } from '@/lib/scrape'
 import type { Campaign, CompanySort } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -59,6 +60,7 @@ export function CampaignSidebar({
 }) {
   const [search, setSearch] = useState('')
   const [pendingRemoval, setPendingRemoval] = useState<Campaign | null>(null)
+  const [scrapeLimitCampaign, setScrapeLimitCampaign] = useState<Campaign | null>(null)
   const [removing, setRemoving] = useState(false)
   const totalReviews = campaigns.reduce((sum, campaign) => sum + (reviewCounts[campaign.id] ?? 0), 0)
   const ratingMetrics = useMemo(() => campaignRatingMetrics(campaigns), [campaigns])
@@ -200,6 +202,7 @@ export function CampaignSidebar({
                 {group.campaigns.map((campaign) => {
                   const active = selectedId === campaign.id
                   const name = campaignDisplayName(campaign)
+                  const scrapedToday = wasScrapedToday(campaign.lastScrapedAt)
                   return (
                     <div
                       key={campaign.id}
@@ -236,6 +239,10 @@ export function CampaignSidebar({
                             ) : null}
                             <span>{reviewCounts[campaign.id] ?? 0} reviews</span>
                           </span>
+                          <span className="mt-1 block text-xs text-muted-foreground">
+                            Last scraped:{' '}
+                            {campaign.lastScrapedAt ? formatScrapedAt(campaign.lastScrapedAt) : '—'}
+                          </span>
                         </span>
                       </button>
                       <div className="mt-2 flex items-center justify-end gap-1">
@@ -245,13 +252,26 @@ export function CampaignSidebar({
                         {campaign.scrapeStatus === 'error' && (
                           <Badge variant="destructive">Failed</Badge>
                         )}
+                        {scrapedToday ? (
+                          <Badge variant="secondary">Today</Badge>
+                        ) : null}
                         <Button
                           type="button"
                           size="icon-sm"
                           variant="ghost"
-                          onClick={() => onScrape(campaign)}
+                          onClick={() => {
+                            if (scrapedToday) {
+                              setScrapeLimitCampaign(campaign)
+                              return
+                            }
+                            onScrape(campaign)
+                          }}
                           disabled={campaign.scrapeStatus === 'scraping'}
-                          aria-label={`Scrape reviews for ${name}`}
+                          aria-label={
+                            scrapedToday
+                              ? `Already scraped ${name} today`
+                              : `Scrape reviews for ${name}`
+                          }
                         >
                           <RefreshCwIcon />
                         </Button>
@@ -295,6 +315,24 @@ export function CampaignSidebar({
             </Button>
             <Button type="button" variant="destructive" onClick={() => void confirmRemove()} disabled={removing}>
               {removing ? 'Removing…' : 'Remove'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={scrapeLimitCampaign != null}
+        onOpenChange={(open) => !open && setScrapeLimitCampaign(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Already scraped today</DialogTitle>
+            <DialogDescription>
+              {scrapeLimitCampaign ? scrapeLimitMessage(scrapeLimitCampaign) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" onClick={() => setScrapeLimitCampaign(null)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

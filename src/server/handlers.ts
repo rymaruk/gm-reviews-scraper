@@ -1,5 +1,6 @@
 import { placeNameFromMapsUrl, preferName } from '@/lib/place'
 import { campaignIdentity } from '@/lib/reviews'
+import { scrapeLimitMessage, wasScrapedToday } from '@/lib/scrape'
 import type { Campaign } from '@/lib/types'
 
 import {
@@ -152,6 +153,11 @@ export async function handleReviews(body: unknown): Promise<ApiResult> {
     const sortBy = optionalString(payload.sortBy)
     const hl = optionalString(payload.hl)
     const scrapeStatus = optionalString(payload.scrapeStatus) as Campaign['scrapeStatus'] | undefined
+    const existing = campaignId ? await getCampaign(campaignId) : undefined
+
+    if (campaignId && !nextPageToken && existing && wasScrapedToday(existing.lastScrapedAt)) {
+      return { status: 429, body: { error: scrapeLimitMessage(existing) } }
+    }
 
     const page = await fetchReviewsPage({
       dataId,
@@ -162,7 +168,6 @@ export async function handleReviews(body: unknown): Promise<ApiResult> {
     })
 
     if (campaignId) {
-      const existing = await getCampaign(campaignId)
       const campaign: Campaign = {
         id: campaignId,
         mapsUrl: existing?.mapsUrl ?? '',

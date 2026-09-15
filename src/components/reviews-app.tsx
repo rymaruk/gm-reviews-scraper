@@ -11,26 +11,34 @@ import {
   ScrapeProgressDialog,
   type ScrapeDialogState,
 } from '@/components/scrape-progress-dialog'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   deleteCampaign as deleteCampaignApi,
   fetchReviewsPage,
   fetchStore,
-  getHealth,
   patchCampaign,
   resolvePlace,
 } from '@/lib/api'
 import { campaignCities, campaignDisplayName, campaignMatchesCity, groupCampaignsByCity, placeNameFromMapsUrl, preferName } from '@/lib/place'
 import { filterReviews, mergeReviews, reviewsToCsv } from '@/lib/reviews'
-import { readFilterParams, writeFilterParams } from '@/lib/search-params'
+import { formatScrapedAt, scrapeLimitMessage, wasScrapedToday } from '@/lib/scrape'
+import { writeFilterParams, readFilterParams, type FilterParams } from '@/lib/search-params'
 import type { Campaign, CompanySort, RatingFilter, SortOption, StoredReview, TimeRange } from '@/lib/types'
 
 const MAX_PAGES = 25
-const initialFilters = readFilterParams()
 
-export function ReviewsApp() {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
-  const [reviews, setReviews] = useState<StoredReview[]>([])
+export function ReviewsApp({
+  initialCampaigns,
+  initialReviews,
+  initialFilters,
+  initialConfigError,
+}: {
+  initialCampaigns: Campaign[]
+  initialReviews: StoredReview[]
+  initialFilters: FilterParams
+  initialConfigError: string | null
+}) {
+  const [campaigns, setCampaigns] = useState(initialCampaigns)
+  const [reviews, setReviews] = useState(initialReviews)
   const [activeId, setActiveId] = useState(initialFilters.company)
   const [query, setQuery] = useState(initialFilters.query)
   const [rating, setRating] = useState<RatingFilter>(initialFilters.rating)
@@ -42,9 +50,8 @@ export function ReviewsApp() {
   const [city, setCity] = useState(initialFilters.city)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [configError, setConfigError] = useState<string | null>(null)
+  const [configError] = useState(initialConfigError)
   const [scrapeDialog, setScrapeDialog] = useState<ScrapeDialogState>({ status: 'idle' })
-  const [storeLoading, setStoreLoading] = useState(true)
   const [storeRevision, setStoreRevision] = useState(0)
   const feedRef = useRef<HTMLDivElement>(null)
   const scrolledFromUrl = useRef(false)
@@ -57,35 +64,6 @@ export function ReviewsApp() {
     setStoreRevision((current) => current + 1)
     return store
   }, [])
-
-  useEffect(() => {
-    void reloadStore()
-      .catch((error: unknown) => {
-        toast.error(error instanceof Error ? error.message : 'Could not load saved reviews.')
-      })
-      .finally(() => setStoreLoading(false))
-
-    void getHealth()
-      .then((health) => {
-        if (health.configured && health.supabase) {
-          setConfigError(null)
-          return
-        }
-        const missing = health.missing?.length
-          ? health.missing.join(', ')
-          : 'SERPAPI_KEY, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY'
-        setConfigError(
-          `Missing on the server: ${missing}. Add them to .env.local or Vercel → Project Settings → Environment Variables, then restart or redeploy.`,
-        )
-      })
-      .catch((error: unknown) => {
-        setConfigError(
-          error instanceof Error
-            ? error.message
-            : 'Could not reach /api/health. Check that the Next.js server is running.',
-        )
-      })
-  }, [reloadStore])
 
   useEffect(() => {
     writeFilterParams({
@@ -142,11 +120,11 @@ export function ReviewsApp() {
   const cities = useMemo(() => campaignCities(campaigns), [campaigns])
 
   useEffect(() => {
-    if (storeLoading || city === 'all') return
+    if (city === 'all') return
     if (!cities.some((name) => name.toLowerCase() === city.toLowerCase())) {
       setCity('all')
     }
-  }, [storeLoading, cities, city])
+  }, [cities, city])
 
   const visibleCampaigns = useMemo(
     () =>
@@ -158,11 +136,11 @@ export function ReviewsApp() {
   )
 
   useEffect(() => {
-    if (storeLoading || activeId === 'all') return
+    if (activeId === 'all') return
     if (!visibleCampaigns.some((campaign) => campaign.id === activeId)) {
       setActiveId('all')
     }
-  }, [storeLoading, visibleCampaigns, activeId])
+  }, [visibleCampaigns, activeId])
 
   const visibleReviews = useMemo(
     () =>
@@ -356,6 +334,11 @@ export function ReviewsApp() {
     campaign: Campaign,
     options?: { reset?: boolean; closeOnSuccess?: boolean },
   ): Promise<boolean> {
+    if (options?.reset && wasScrapedToday(campaign.lastScrapedAt)) {
+      toast.error(scrapeLimitMessage(campaign))
+      return false
+    }
+
     const fallbackName = campaignDisplayName(campaign)
     setScrapeDialog({ status: 'running', name: fallbackName })
     setCampaigns((current) =>
@@ -445,7 +428,18 @@ export function ReviewsApp() {
   }
 
   async function scrapeAll() {
-    for (const campaign of campaigns) {
+    const due = campaigns.filter((campaign) => !wasScrapedToday(campaign.lastScrapedAt))
+    const skipped = campaigns.length - due.length
+    if (due.length === 0) {
+      toast.error('Every shop has already been scraped today. Only one scrape per day is allowed.')
+      return
+    }
+    if (skipped > 0) {
+      toast.message(
+        `Skipping ${skipped} shop${skipped === 1 ? '' : 's'} already scraped today.`,
+      )
+    }
+    for (const campaign of due) {
       const ok = await scrapeCampaign(campaign, { reset: true, closeOnSuccess: false })
       if (!ok) return
     }
@@ -484,7 +478,6 @@ export function ReviewsApp() {
         selectedId={activeId}
         reviewCounts={reviewCounts}
         companySort={companySort}
-        loading={storeLoading}
         onSelect={selectCompany}
         onCompanySortChange={setCompanySort}
         onAdd={() => setDialogOpen(true)}
@@ -521,12 +514,7 @@ export function ReviewsApp() {
           />
         </div>
         <div ref={feedRef} className="min-h-0 flex-1 overflow-y-auto">
-          {storeLoading ? (
-            <div className="flex items-baseline justify-between gap-4 px-4 pt-4">
-              <Skeleton className="h-4 w-64" />
-              <Skeleton className="h-4 w-40" />
-            </div>
-          ) : campaigns.length > 0 ? (
+          {campaigns.length > 0 ? (
             <div className="flex items-baseline justify-between gap-4 px-4 pt-4">
               <p className="text-sm text-muted-foreground">
                 Showing {visibleReviews.length} review{visibleReviews.length === 1 ? '' : 's'} grouped
@@ -543,7 +531,6 @@ export function ReviewsApp() {
             reviews={visibleReviews}
             activeId={activeId}
             sort={sort}
-            loading={storeLoading}
             emptyMessage={city === 'all' ? undefined : 'Try another city or choose All cities.'}
           />
         </div>
@@ -560,11 +547,4 @@ export function ReviewsApp() {
       />
     </div>
   )
-}
-
-function formatScrapedAt(date: Date): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
 }

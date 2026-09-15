@@ -28,6 +28,18 @@ export const defaultFilterParams: FilterParams = {
   city: 'all',
 }
 
+export function readFilterParamsFromRecord(
+  searchParams: Record<string, string | string[] | undefined>,
+): FilterParams {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(searchParams)) {
+    const next = Array.isArray(value) ? value[0] : value
+    if (next) params.set(key, next)
+  }
+  const query = params.toString()
+  return readFilterParams(query ? `?${query}` : '')
+}
+
 export function readFilterParams(search = typeof window === 'undefined' ? '' : window.location.search): FilterParams {
   const params = new URLSearchParams(search)
   const rating = params.get('rating')
