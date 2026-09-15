@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 
 import { ActiveFiltersPanel } from '@/components/active-filters-panel'
 import { AppHeader } from '@/components/app-nav'
+import { MetricsBreadcrumb } from '@/components/metrics-breadcrumb'
 import { Stars } from '@/components/stars'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -206,6 +207,7 @@ export function MetricsGrid({
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
           <div>
+            <MetricsBreadcrumb />
             <h1 className="font-heading text-3xl font-medium">Metrics</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Assign a weight to each shop. Values can be 0 or greater, and the total should be {WEIGHT_TOTAL}%.
