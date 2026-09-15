@@ -191,25 +191,20 @@ export function WeightCsvImportDialog({
         </DialogHeader>
 
         {choosing ? (
-          <div className="grid gap-3 py-1">
-            <label htmlFor={FILE_INPUT_ID} className="grid max-w-md gap-2">
-              <span className={cn(buttonVariants({ variant: 'outline' }), 'w-fit cursor-pointer')}>
-                <UploadIcon />
-                Choose CSV
-              </span>
+          <div className="flex flex-wrap items-center gap-3 py-1">
+            <label
+              htmlFor={FILE_INPUT_ID}
+              className={cn(buttonVariants({ variant: 'outline' }), 'relative w-fit cursor-pointer')}
+            >
+              <UploadIcon />
+              Choose CSV
               <input
                 id={FILE_INPUT_ID}
                 ref={fileRef}
                 type="file"
                 name="metrics-weight-csv"
                 accept=".csv,text/csv,text/plain"
-                className="block h-auto w-full cursor-pointer text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-background file:px-2.5 file:py-1 file:text-sm file:font-medium"
-                onPointerDown={(event) => {
-                  event.stopPropagation()
-                }}
-                onClick={(event) => {
-                  event.stopPropagation()
-                }}
+                className="sr-only"
                 onChange={(event) => {
                   applyPickedFile(event.target.files?.[0] ?? null)
                 }}
