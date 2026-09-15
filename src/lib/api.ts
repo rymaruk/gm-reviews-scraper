@@ -23,7 +23,7 @@ export async function getHealth(): Promise<{
 }
 
 export async function fetchStore(): Promise<{ campaigns: Campaign[]; reviews: StoredReview[] }> {
-  const response = await fetch('/api/store')
+  const response = await fetch('/api/store', { cache: 'no-store' })
   return parseJson(response)
 }
 

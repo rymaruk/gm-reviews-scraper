@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, type FormEvent } from 'react'
 import { Loader2Icon, MapPinIcon } from 'lucide-react'
 

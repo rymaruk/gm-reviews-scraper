@@ -1,4 +1,4 @@
-import type { Campaign, CompanySort } from './types.js'
+import type { Campaign, CompanySort } from './types'
 
 const PLACEHOLDER_NAMES = new Set(['unknown place', 'unknown campaign', 'unknown'])
 

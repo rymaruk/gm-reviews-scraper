@@ -1,13 +1,14 @@
 # GoogleMap Review
 
-React app that collects Google Maps reviews for campaign shops. Paste Maps place links, scrape reviews through [SerpAPI](https://serpapi.com), and store everything in [Supabase](https://supabase.com).
+Next.js app that collects Google Maps reviews for campaign shops. Paste Maps place links, scrape reviews through [SerpAPI](https://serpapi.com), and store everything in [Supabase](https://supabase.com).
 
 ## Setup
 
-1. Copy `.env.example` to `.env` and set:
+1. Copy `.env.example` to `.env.local` and set:
 
 ```bash
 SERPAPI_KEY=
+SERPAPI_KEY_RESERV=
 SUPABASE_URL=
 SUPABASE_PUBLISHABLE_KEY=
 ```
@@ -30,17 +31,18 @@ npx supabase db push --db-url "postgresql://postgres:[DB_PASSWORD]@db.[PROJECT_R
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). Vite proxies `/api` to the Express process on port `8787`.
+Open [http://localhost:3000](http://localhost:3000). The App Router serves both the UI and `/api/*` route handlers.
 
 ## Vercel
 
-Local `.env` is not deployed. Add the same keys in **Vercel → Project → Settings → Environment Variables** for **Production** (and Preview if you use it), then **Redeploy**:
+Local `.env.local` is not deployed. Add the same keys in **Vercel → Project → Settings → Environment Variables** for **Production** (and Preview if you use it), then **Redeploy**:
 
 - `SERPAPI_KEY`
+- `SERPAPI_KEY_RESERV` (optional backup; used if the main key gets an error)
 - `SUPABASE_URL`
 - `SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_ANON_KEY`)
 
-The API is served from Vercel Functions in `api/` (`GET`/`POST`/`PATCH`/`DELETE` handlers). Scraped campaigns and reviews are upserted into Supabase on every page.
+The API lives in Next.js Route Handlers under `src/app/api/`. Scraped campaigns and reviews are upserted into Supabase on every page.
 
 ## Usage
 
@@ -51,5 +53,6 @@ The API is served from Vercel Functions in `api/` (`GET`/`POST`/`PATCH`/`DELETE`
 ## Notes
 
 - SerpAPI and Supabase keys stay on the server.
+- `SERPAPI_KEY` is used first. If SerpAPI returns an error, the same request is retried with `SERPAPI_KEY_RESERV`.
 - Each reviews page uses one SerpAPI search credit.
-- Do not commit `.env`.
+- Do not commit `.env` or `.env.local`.

@@ -28,7 +28,7 @@ export const defaultFilterParams: FilterParams = {
   city: 'all',
 }
 
-export function readFilterParams(search = window.location.search): FilterParams {
+export function readFilterParams(search = typeof window === 'undefined' ? '' : window.location.search): FilterParams {
   const params = new URLSearchParams(search)
   const rating = params.get('rating')
   const sort = params.get('sort')
@@ -51,6 +51,7 @@ export function readFilterParams(search = window.location.search): FilterParams 
 }
 
 export function writeFilterParams(filters: FilterParams): void {
+  if (typeof window === 'undefined') return
   const params = new URLSearchParams()
 
   if (filters.query) params.set('q', filters.query)

@@ -1,3 +1,5 @@
+'use client'
+
 import { useMemo, useState, type ComponentType, type SVGProps } from 'react'
 import {
   ArrowDownIcon,

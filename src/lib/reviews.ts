@@ -1,5 +1,5 @@
-import { campaignDisplayName } from './place.js'
-import type { Campaign, RatingFilter, SortOption, StoredReview, TimeRange } from './types.js'
+import { campaignDisplayName } from './place'
+import type { Campaign, RatingFilter, SortOption, StoredReview, TimeRange } from './types'
 
 export function mergeReviews(existing: StoredReview[], incoming: StoredReview[]): StoredReview[] {
   const byId = new Map(existing.map((review) => [reviewKey(review), review]))

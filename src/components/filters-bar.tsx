@@ -1,3 +1,5 @@
+'use client'
+
 import { DownloadIcon, RefreshCwIcon, SearchIcon, StarIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'

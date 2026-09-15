@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { cityFromAddress } from './place.js'
+import { cityFromAddress } from './place'
 
 describe('cityFromAddress', () => {
   it('uses the city, not the oblast, from a Ukrainian Maps address', () => {
