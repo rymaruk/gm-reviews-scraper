@@ -25,7 +25,8 @@ export function ActiveFiltersPanel({
           type="button"
           className="inline-flex h-7 max-w-full items-center gap-1 rounded-full border bg-muted/70 px-2.5 text-sm transition-colors hover:bg-muted"
           onClick={() => void onClear(chip.id)}
-          aria-label={`Clear filter ${chip.label}`}
+          aria-label={`Clear ${chip.id} filter ${chip.label}`}
+          data-filter-id={chip.id}
         >
           <span className="min-w-0 truncate">{chip.label}</span>
           <XIcon className="size-3.5 shrink-0" />

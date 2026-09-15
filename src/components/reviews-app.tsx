@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { AddCampaignDialog } from '@/components/add-campaign-dialog'
 import { ActiveFiltersPanel } from '@/components/active-filters-panel'
+import { AppHeader } from '@/components/app-nav'
 import { CampaignSidebar } from '@/components/campaign-sidebar'
 import { FiltersBar } from '@/components/filters-bar'
 import { ReviewFeed } from '@/components/review-feed'
@@ -532,19 +533,26 @@ export function ReviewsApp({
   }
 
   return (
-    <div className="flex h-svh overflow-hidden bg-background">
-      <CampaignSidebar
-        campaigns={visibleCampaigns}
-        selectedId={activeId}
-        reviewCounts={reviewCounts}
-        companySort={companySort}
-        onSelect={selectCompany}
-        onCompanySortChange={setCompanySort}
-        onAdd={() => setDialogOpen(true)}
-        onScrape={(campaign) => void scrapeCampaign(campaign, { reset: true })}
-        onRemove={removeCampaign}
+    <div className="flex h-svh flex-col overflow-hidden bg-background">
+      <AppHeader
+        current="reviews"
+        onScrapeAll={() => void scrapeAll()}
+        scraping={scraping}
+        hasCampaigns={campaigns.length > 0}
       />
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <CampaignSidebar
+          campaigns={visibleCampaigns}
+          selectedId={activeId}
+          reviewCounts={reviewCounts}
+          companySort={companySort}
+          onSelect={selectCompany}
+          onCompanySortChange={setCompanySort}
+          onAdd={() => setDialogOpen(true)}
+          onScrape={(campaign) => void scrapeCampaign(campaign, { reset: true })}
+          onRemove={removeCampaign}
+        />
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
         {configError ? (
           <div className="shrink-0 border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">
             {configError}
@@ -560,7 +568,6 @@ export function ReviewsApp({
             toDate={toDate}
             city={city}
             cities={cities}
-            scraping={scraping}
             hasCampaigns={campaigns.length > 0}
             onQueryChange={setQuery}
             onRatingChange={setRating}
@@ -569,7 +576,6 @@ export function ReviewsApp({
             onFromDateChange={setFromDate}
             onToDateChange={setToDate}
             onCityChange={setCity}
-            onScrapeAll={() => void scrapeAll()}
             onExport={exportCsv}
           />
         </div>
@@ -604,6 +610,7 @@ export function ReviewsApp({
           />
         </div>
       </main>
+      </div>
       <AddCampaignDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}

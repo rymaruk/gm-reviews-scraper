@@ -1,15 +1,36 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Loader2Icon, SearchIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { AppNav } from '@/components/app-nav'
+import { ActiveFiltersPanel } from '@/components/active-filters-panel'
+import { AppHeader } from '@/components/app-nav'
 import { Stars } from '@/components/stars'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { updateCampaignWeights } from '@/lib/api'
-import { campaignDisplayName } from '@/lib/place'
+import {
+  campaignCities,
+  campaignDisplayName,
+  campaignMatchesCity,
+  groupCampaignsByCity,
+} from '@/lib/place'
 import { formatCampaignRating } from '@/lib/reviews'
+import {
+  clearActiveFilter,
+  defaultFilterParams,
+  listActiveFilters,
+  resetActiveFilters,
+  type ActiveFilterId,
+  type FilterParams,
+} from '@/lib/search-params'
 import type { Campaign } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import {
@@ -22,6 +43,8 @@ import {
   weightsTotal,
 } from '@/lib/weights'
 
+const AUTOSAVE_MS = 1000
+
 export function MetricsGrid({
   initialCampaigns,
   initialError,
@@ -31,18 +54,45 @@ export function MetricsGrid({
 }) {
   const [campaigns, setCampaigns] = useState(initialCampaigns)
   const [drafts, setDrafts] = useState<Record<string, string>>(() => draftsFromCampaigns(initialCampaigns))
+  const [filter, setFilter] = useState('')
+  const [city, setCity] = useState('all')
   const [saving, setSaving] = useState(false)
-  const sorted = useMemo(
-    () =>
-      [...campaigns].sort((left, right) =>
-        campaignDisplayName(left).localeCompare(campaignDisplayName(right), 'en', {
-          sensitivity: 'base',
-        }) || left.id.localeCompare(right.id),
-      ),
-    [campaigns],
+  const [lastEditedId, setLastEditedId] = useState<string | null>(null)
+  const [editVersion, setEditVersion] = useState(0)
+  const draftsRef = useRef(drafts)
+  draftsRef.current = drafts
+  const cities = useMemo(() => campaignCities(campaigns), [campaigns])
+  const visible = useMemo(() => {
+    const query = filter.trim().toLowerCase()
+    return campaigns.filter((campaign) => {
+      if (!campaignMatchesCity(campaign, city)) return false
+      if (!query) return true
+      const name = campaignDisplayName(campaign).toLowerCase()
+      const address = (campaign.address ?? '').toLowerCase()
+      return name.includes(query) || address.includes(query)
+    })
+  }, [campaigns, city, filter])
+  const grouped = useMemo(() => groupCampaignsByCity(visible), [visible])
+  const currentFilters = useMemo(
+    () => ({ ...defaultFilterParams, query: filter, city }),
+    [filter, city],
   )
+  const activeFilterChips = useMemo(() => listActiveFilters(currentFilters), [currentFilters])
 
-  const parsedWeights = sorted.map((campaign) => parseWeight(drafts[campaign.id] ?? ''))
+  function applyMetricFilters(next: FilterParams) {
+    setFilter(next.query)
+    setCity(next.city)
+  }
+
+  function clearActiveFilterChip(id: ActiveFilterId) {
+    applyMetricFilters(clearActiveFilter(currentFilters, id))
+  }
+
+  function resetAllFilters() {
+    applyMetricFilters(resetActiveFilters())
+  }
+
+  const parsedWeights = campaigns.map((campaign) => parseWeight(drafts[campaign.id] ?? ''))
   const numericWeights = parsedWeights.filter((value): value is number => value != null)
   const invalidRow = parsedWeights.some((value) => value == null || value < 0)
   const total = weightsTotal(numericWeights)
@@ -50,28 +100,43 @@ export function MetricsGrid({
   const canSave =
     campaigns.length > 0 && !invalidRow && parsedWeights.length === campaigns.length && validation.ok
   const remaining = roundWeight(WEIGHT_TOTAL - total)
-  const dirty = sorted.some(
+  const dirty = campaigns.some(
     (campaign) => parseWeight(drafts[campaign.id] ?? '') !== roundWeight(campaign.weight),
   )
+  const filtersActive = Boolean(filter.trim()) || city !== 'all'
 
-  function setDraft(id: string, value: string) {
-    setDrafts((current) => ({ ...current, [id]: value }))
-  }
+  const persistWeights = useCallback(async (nextDrafts: Record<string, string>) => {
+    const rows = campaigns
+      .slice()
+      .sort((left, right) => left.id.localeCompare(right.id))
+    const parsed = rows.map((campaign) => ({
+      id: campaign.id,
+      value: parseWeight(nextDrafts[campaign.id] ?? ''),
+    }))
 
-  function commitDraft(id: string) {
-    const parsed = parseWeight(drafts[id] ?? '')
-    if (parsed == null || parsed < 0) return
-    setDraft(id, formatWeight(parsed))
-  }
+    if (parsed.some((item) => item.value == null || item.value < 0)) {
+      toast.error('Each weight must be 0 or greater.')
+      return
+    }
 
-  async function save() {
-    if (!canSave) return
+    const weights = parsed.map((item) => ({
+      id: item.id,
+      weight: roundWeight(item.value ?? 0),
+    }))
+    const check = validateWeights(weights.map((item) => item.weight))
+    if (!check.ok) {
+      toast.error(check.error ?? `Weights must add up to ${WEIGHT_TOTAL}%.`)
+      return
+    }
+
+    const unchanged = campaigns.every((campaign) => {
+      const next = weights.find((item) => item.id === campaign.id)
+      return next != null && roundWeight(campaign.weight) === next.weight
+    })
+    if (unchanged) return
+
     setSaving(true)
     try {
-      const weights = sorted.map((campaign) => ({
-        id: campaign.id,
-        weight: roundWeight(parseWeight(drafts[campaign.id] ?? '') ?? 0),
-      }))
       await updateCampaignWeights(weights)
       setCampaigns((current) =>
         current.map((campaign) => {
@@ -79,124 +144,218 @@ export function MetricsGrid({
           return next ? { ...campaign, weight: next.weight } : campaign
         }),
       )
-      setDrafts(Object.fromEntries(weights.map((item) => [item.id, formatWeight(item.weight)])))
-      toast.success('Shop weights saved.')
+      setDrafts((current) => {
+        const same = rows.every((campaign) => current[campaign.id] === nextDrafts[campaign.id])
+        return same
+          ? Object.fromEntries(weights.map((item) => [item.id, formatWeight(item.weight)]))
+          : current
+      })
+      toast.success('Weights updated')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not save weights.')
     } finally {
       setSaving(false)
     }
+  }, [campaigns])
+
+  const persistRef = useRef(persistWeights)
+  persistRef.current = persistWeights
+
+  useEffect(() => {
+    if (editVersion === 0) return
+
+    const timer = window.setTimeout(() => {
+      void persistRef.current(draftsRef.current)
+    }, AUTOSAVE_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [editVersion])
+
+  function setDraft(id: string, value: string) {
+    setLastEditedId(id)
+    setDrafts((current) => ({ ...current, [id]: value }))
+    setEditVersion((current) => current + 1)
+  }
+
+  function commitDraft(id: string) {
+    const parsed = parseWeight(drafts[id] ?? '')
+    if (parsed == null || parsed < 0) return
+    const formatted = formatWeight(parsed)
+    if (formatted === (drafts[id] ?? '')) return
+    setDraft(id, formatted)
   }
 
   return (
-    <div className="flex min-h-svh flex-col bg-background">
-      <header className="flex items-center justify-between gap-3 border-b bg-sidebar px-4 py-3">
-        <div>
-          <p className="font-heading text-lg font-medium">GoogleMap Reviews</p>
-          <AppNav current="metrics" />
-        </div>
-      </header>
+    <div className="flex h-svh flex-col overflow-hidden bg-background">
+      <AppHeader current="metrics" />
 
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-8">
-        <div>
-          <h1 className="font-heading text-3xl font-medium">Metric</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Assign a weight to each shop. Values can be 0 or greater, and the total must be {WEIGHT_TOTAL}%.
+      <main className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
+          <div>
+            <h1 className="font-heading text-3xl font-medium">Metric</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Assign a weight to each shop. Values can be 0 or greater, and the total must be {WEIGHT_TOTAL}%.
+              Changes save automatically when the total is {WEIGHT_TOTAL}%.
+            </p>
+          </div>
+
+          {initialError ? (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {initialError}
+            </div>
+          ) : campaigns.length === 0 ? (
+            <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+              Add a shop on the reviews page before setting weights.
+            </div>
+          ) : (
+            <>
+              <div className="sticky top-0 z-20 flex flex-col gap-3 bg-background/95 py-3 backdrop-blur-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="relative min-w-0 flex-1">
+                    <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={filter}
+                      onChange={(event) => setFilter(event.target.value)}
+                      placeholder="Filter by name or address"
+                      className="pl-8"
+                      aria-label="Filter shops by name or address"
+                    />
+                  </div>
+                  <Select value={city} onValueChange={setCity} disabled={cities.length === 0}>
+                    <SelectTrigger className="w-full sm:w-48" aria-label="Filter by city">
+                      <SelectValue placeholder="All cities" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All cities</SelectItem>
+                      {cities.map((name) => (
+                        <SelectItem key={name} value={name}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <ActiveFiltersPanel
+                  chips={activeFilterChips}
+                  onClear={clearActiveFilterChip}
+                  onReset={resetAllFilters}
+                />
+              </div>
+
+              {visible.length === 0 ? (
+                <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+                  No shops match that name, address, or city.
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 z-10 bg-muted/90 text-left text-xs tracking-wide text-muted-foreground uppercase backdrop-blur-sm">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Address</th>
+                        <th className="w-44 px-4 py-3 text-right font-semibold">Weight</th>
+                      </tr>
+                    </thead>
+                    {grouped.map((group) => (
+                      <tbody key={group.city}>
+                        <tr>
+                          <th
+                            colSpan={2}
+                            scope="colgroup"
+                            className="border-t bg-muted/50 px-4 py-2 text-left text-xs font-semibold tracking-wide text-muted-foreground"
+                          >
+                            {group.city} ({group.campaigns.length})
+                          </th>
+                        </tr>
+                        {group.campaigns.map((campaign) => {
+                          const raw = drafts[campaign.id] ?? ''
+                          const parsed = parseWeight(raw)
+                          const rowInvalid = parsed == null || parsed < 0
+                          const name = campaignDisplayName(campaign)
+                          const reviewsCount = campaign.reviewsCount ?? 0
+                          const rowSaving = saving && lastEditedId === campaign.id
+                          return (
+                            <tr key={campaign.id} className="border-t">
+                              <td className="px-4 py-3 align-top">
+                                <p className="font-medium break-all">{name}</p>
+                                <p className="mt-0.5 text-xs break-all text-muted-foreground">
+                                  {campaign.address ?? campaign.type ?? 'Google Maps place'}
+                                </p>
+                                <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                  {campaign.rating != null ? (
+                                    <>
+                                      <Stars rating={campaign.rating} />
+                                      <span className="tabular-nums text-amber-400">
+                                        {formatCampaignRating(campaign.rating)}
+                                      </span>
+                                      <span className="h-3 w-px shrink-0 bg-border" aria-hidden="true" />
+                                    </>
+                                  ) : null}
+                                  <span>
+                                    {reviewsCount} review{reviewsCount === 1 ? '' : 's'}
+                                  </span>
+                                </p>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {rowSaving ? (
+                                    <Loader2Icon
+                                      className="size-4 shrink-0 animate-spin text-muted-foreground"
+                                      aria-label="Saving weight"
+                                    />
+                                  ) : null}
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={raw}
+                                    aria-label={`Weight for ${name}`}
+                                    aria-invalid={rowInvalid}
+                                    className="w-24 text-right tabular-nums"
+                                    onChange={(event) => setDraft(campaign.id, event.target.value)}
+                                    onBlur={() => commitDraft(campaign.id)}
+                                  />
+                                  <span className="w-4 text-xs text-muted-foreground">%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    ))}
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </main>
+
+      {campaigns.length > 0 && !initialError ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-3 border-t bg-sidebar px-4 py-3">
+          {saving ? (
+            <Loader2Icon className="size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden />
+          ) : null}
+          <p
+            className={cn(
+              'text-sm tabular-nums',
+              canSave ? 'text-muted-foreground' : 'text-destructive',
+            )}
+            aria-live="polite"
+          >
+            {saving
+              ? 'Saving weights…'
+              : invalidRow
+                ? 'Each weight must be 0 or greater.'
+                : Math.abs(total - WEIGHT_TOTAL) <= WEIGHT_EPSILON
+                  ? dirty
+                    ? `Total: ${WEIGHT_TOTAL}% · Saving shortly`
+                    : `Total: ${WEIGHT_TOTAL}%`
+                  : remaining > 0
+                    ? `Total: ${formatWeight(total)}% (${formatWeight(remaining)}% remaining)`
+                    : `Total: ${formatWeight(total)}% (${formatWeight(Math.abs(remaining))}% over)`}
+            {filtersActive ? ` · Showing ${visible.length} of ${campaigns.length}` : null}
           </p>
         </div>
-
-        {initialError ? (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {initialError}
-          </div>
-        ) : campaigns.length === 0 ? (
-          <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-            Add a shop on the reviews page before setting weights.
-          </div>
-        ) : (
-          <>
-            <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/60 text-left text-xs tracking-wide text-muted-foreground uppercase">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Address</th>
-                    <th className="w-40 px-4 py-3 text-right font-semibold">Weight</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.map((campaign) => {
-                    const raw = drafts[campaign.id] ?? ''
-                    const parsed = parseWeight(raw)
-                    const rowInvalid = parsed == null || parsed < 0
-                    const name = campaignDisplayName(campaign)
-                    const reviewsCount = campaign.reviewsCount ?? 0
-                    return (
-                      <tr key={campaign.id} className="border-t">
-                        <td className="px-4 py-3 align-top">
-                          <p className="font-medium break-all">{name}</p>
-                          <p className="mt-0.5 text-xs break-all text-muted-foreground">
-                            {campaign.address ?? campaign.type ?? 'Google Maps place'}
-                          </p>
-                          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            {campaign.rating != null ? (
-                              <>
-                                <Stars rating={campaign.rating} />
-                                <span className="tabular-nums text-amber-400">
-                                  {formatCampaignRating(campaign.rating)}
-                                </span>
-                                <span className="h-3 w-px shrink-0 bg-border" aria-hidden="true" />
-                              </>
-                            ) : null}
-                            <span>
-                              {reviewsCount} review{reviewsCount === 1 ? '' : 's'}
-                            </span>
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 align-top">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Input
-                              type="text"
-                              inputMode="decimal"
-                              value={raw}
-                              aria-label={`Weight for ${name}`}
-                              aria-invalid={rowInvalid}
-                              className="w-24 text-right tabular-nums"
-                              onChange={(event) => setDraft(campaign.id, event.target.value)}
-                              onBlur={() => commitDraft(campaign.id)}
-                            />
-                            <span className="w-4 text-xs text-muted-foreground">%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p
-                className={cn(
-                  'text-sm tabular-nums',
-                  canSave ? 'text-muted-foreground' : 'text-destructive',
-                )}
-                aria-live="polite"
-              >
-                {invalidRow
-                  ? 'Each weight must be 0 or greater.'
-                  : Math.abs(total - WEIGHT_TOTAL) <= WEIGHT_EPSILON
-                    ? `Total: ${WEIGHT_TOTAL}%`
-                    : remaining > 0
-                      ? `Total: ${formatWeight(total)}% (${formatWeight(remaining)}% remaining)`
-                      : `Total: ${formatWeight(total)}% (${formatWeight(Math.abs(remaining))}% over)`}
-              </p>
-              <Button type="button" onClick={() => void save()} disabled={!canSave || saving || !dirty}>
-                {saving ? 'Saving…' : 'Save weights'}
-              </Button>
-            </div>
-          </>
-        )}
-      </main>
+      ) : null}
     </div>
   )
 }

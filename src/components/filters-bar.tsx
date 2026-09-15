@@ -1,6 +1,6 @@
 'use client'
 
-import { DownloadIcon, RefreshCwIcon, SearchIcon, StarIcon } from 'lucide-react'
+import { DownloadIcon, SearchIcon, StarIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,7 +26,6 @@ export function FiltersBar({
   toDate,
   city,
   cities,
-  scraping,
   hasCampaigns,
   onQueryChange,
   onRatingChange,
@@ -35,7 +34,6 @@ export function FiltersBar({
   onFromDateChange,
   onToDateChange,
   onCityChange,
-  onScrapeAll,
   onExport,
 }: {
   query: string
@@ -46,7 +44,6 @@ export function FiltersBar({
   toDate: string
   city: string
   cities: string[]
-  scraping: boolean
   hasCampaigns: boolean
   onQueryChange: (value: string) => void
   onRatingChange: (value: RatingFilter) => void
@@ -55,7 +52,6 @@ export function FiltersBar({
   onFromDateChange: (value: string) => void
   onToDateChange: (value: string) => void
   onCityChange: (value: string) => void
-  onScrapeAll: () => void
   onExport: () => void
 }) {
   return (
@@ -145,10 +141,6 @@ export function FiltersBar({
           <Button variant="outline" onClick={onExport} disabled={!hasCampaigns}>
             <DownloadIcon />
             Export CSV
-          </Button>
-          <Button onClick={onScrapeAll} disabled={scraping || !hasCampaigns}>
-            <RefreshCwIcon className={scraping ? 'animate-spin' : undefined} />
-            Scrape all
           </Button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type ComponentType, type SVGProps } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import {
   ArrowDownIcon,
   ArrowDownWideNarrowIcon,
@@ -14,7 +14,6 @@ import {
   Trash2Icon,
 } from 'lucide-react'
 
-import { AppNav } from '@/components/app-nav'
 import { Stars } from '@/components/stars'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -60,6 +59,8 @@ export function CampaignSidebar({
   onRemove: (campaign: Campaign) => void | Promise<void>
 }) {
   const [search, setSearch] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
   const [pendingRemoval, setPendingRemoval] = useState<Campaign | null>(null)
   const [scrapeLimitCampaign, setScrapeLimitCampaign] = useState<Campaign | null>(null)
   const [removing, setRemoving] = useState(false)
@@ -78,6 +79,17 @@ export function CampaignSidebar({
     return groupCampaignsByCity(matched, companySort)
   }, [campaigns, search, companySort])
 
+  useEffect(() => {
+    if (searchOpen) searchRef.current?.focus()
+  }, [searchOpen])
+
+  function toggleSearch() {
+    setSearchOpen((open) => {
+      if (open) setSearch('')
+      return !open
+    })
+  }
+
   async function confirmRemove() {
     if (!pendingRemoval) return
     setRemoving(true)
@@ -91,59 +103,67 @@ export function CampaignSidebar({
 
   return (
     <aside className="flex h-full w-80 shrink-0 flex-col border-r bg-sidebar">
-      <div className="flex items-center justify-between gap-2 px-4 py-4">
-        <div className="min-w-0">
-          <h1 className="font-heading text-lg font-medium">GoogleMap Reviews</h1>
-          <div className="mt-1">
-            <AppNav current="reviews" />
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                size="icon-sm"
-                variant="outline"
-                onClick={() =>
-                  onCompanySortChange(companySort === 'rating-desc' ? 'rating-asc' : 'rating-desc')
-                }
-                aria-label={
-                  companySort === 'rating-desc'
-                    ? 'Sort companies by rating, lowest first'
-                    : 'Sort companies by rating, highest first'
-                }
-              >
-                {companySort === 'rating-desc' ? (
-                  <ArrowDownWideNarrowIcon />
-                ) : (
-                  <ArrowUpNarrowWideIcon />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {companySort === 'rating-desc' ? 'Rating: high to low' : 'Rating: low to high'}
-            </TooltipContent>
-          </Tooltip>
-          <Button size="sm" onClick={onAdd}>
-            <PlusIcon />
-            Add
-          </Button>
-        </div>
+      <div className="flex items-center gap-1 px-3 py-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant={searchOpen || search ? 'default' : 'outline'}
+              onClick={toggleSearch}
+              aria-label={searchOpen ? 'Hide company search' : 'Search companies by name or address'}
+              aria-pressed={searchOpen}
+            >
+              <SearchIcon />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {searchOpen ? 'Hide search' : 'Search by name or address'}
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="outline"
+              onClick={() =>
+                onCompanySortChange(companySort === 'rating-desc' ? 'rating-asc' : 'rating-desc')
+              }
+              aria-label={
+                companySort === 'rating-desc'
+                  ? 'Sort companies by rating, lowest first'
+                  : 'Sort companies by rating, highest first'
+              }
+            >
+              {companySort === 'rating-desc' ? (
+                <ArrowDownWideNarrowIcon />
+              ) : (
+                <ArrowUpNarrowWideIcon />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {companySort === 'rating-desc' ? 'Rating: high to low' : 'Rating: low to high'}
+          </TooltipContent>
+        </Tooltip>
+        <Button size="sm" onClick={onAdd}>
+          <PlusIcon />
+          Add
+        </Button>
       </div>
 
-      <div className="px-3 pb-3">
-        <div className="relative">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+      {searchOpen ? (
+        <div className="px-3 pb-3">
           <Input
+            ref={searchRef}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search by name or address"
-            className="pl-8"
             aria-label="Search companies by name or address"
           />
         </div>
-      </div>
+      ) : null}
 
       <div className="px-3 pb-3">
         <button
