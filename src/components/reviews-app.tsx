@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
 import { toast } from 'sonner'
 
 import { AddCampaignDialog } from '@/components/add-campaign-dialog'
+import { ActiveFiltersPanel } from '@/components/active-filters-panel'
 import { CampaignSidebar } from '@/components/campaign-sidebar'
 import { FiltersBar } from '@/components/filters-bar'
 import { ReviewFeed } from '@/components/review-feed'
@@ -21,7 +22,15 @@ import {
 import { campaignCities, campaignDisplayName, campaignMatchesCity, groupCampaignsByCity, placeNameFromMapsUrl, preferName } from '@/lib/place'
 import { filterReviews, mergeReviews, reviewsToCsv } from '@/lib/reviews'
 import { formatScrapedAt, scrapeLimitMessage, wasScrapedToday } from '@/lib/scrape'
-import { writeFilterParams, readFilterParams, type FilterParams } from '@/lib/search-params'
+import {
+  clearActiveFilter,
+  listActiveFilters,
+  readFilterParams,
+  resetActiveFilters,
+  writeFilterParams,
+  type ActiveFilterId,
+  type FilterParams,
+} from '@/lib/search-params'
 import type { Campaign, CompanySort, RatingFilter, SortOption, StoredReview, TimeRange } from '@/lib/types'
 
 const MAX_PAGES = 25
@@ -168,6 +177,57 @@ export function ReviewsApp({
     if (timestamps.length === 0) return undefined
     return new Date(Math.max(...timestamps))
   }, [visibleCampaigns, activeId])
+
+  const currentFilters = useMemo<FilterParams>(
+    () => ({
+      query,
+      rating,
+      sort,
+      companySort,
+      timeRange,
+      fromDate,
+      toDate,
+      company: activeId,
+      city,
+    }),
+    [query, rating, sort, companySort, timeRange, fromDate, toDate, activeId, city],
+  )
+
+  const activeFilterChips = useMemo(() => {
+    const campaign = activeId === 'all' ? undefined : campaigns.find((item) => item.id === activeId)
+    return listActiveFilters(currentFilters, {
+      company: campaign ? campaignDisplayName(campaign) : undefined,
+    })
+  }, [activeId, campaigns, currentFilters])
+
+  const applyFilters = useCallback(
+    (next: FilterParams) => {
+      startTransition(() => {
+        setQuery(next.query)
+        setRating(next.rating)
+        setSort(next.sort)
+        setCompanySort(next.companySort)
+        setTimeRange(next.timeRange)
+        setFromDate(next.fromDate)
+        setToDate(next.toDate)
+        setActiveId(next.company)
+        setCity(next.city)
+      })
+      if (next.company === 'all') {
+        scrollingToRef.current = 'all'
+        feedRef.current?.scrollTo({ top: 0, behavior: 'auto' })
+      }
+    },
+    [],
+  )
+
+  async function clearActiveFilterChip(id: ActiveFilterId) {
+    applyFilters(clearActiveFilter(currentFilters, id))
+  }
+
+  async function resetAllFilters() {
+    applyFilters(resetActiveFilters())
+  }
 
   useEffect(() => {
     const root = feedRef.current
@@ -514,6 +574,15 @@ export function ReviewsApp({
           />
         </div>
         <div ref={feedRef} className="min-h-0 flex-1 overflow-y-auto">
+          {activeFilterChips.length > 0 ? (
+            <div className="sticky top-0 z-10 border-b bg-background/95 px-4 py-3 backdrop-blur-sm">
+              <ActiveFiltersPanel
+                chips={activeFilterChips}
+                onClear={clearActiveFilterChip}
+                onReset={resetAllFilters}
+              />
+            </div>
+          ) : null}
           {campaigns.length > 0 ? (
             <div className="flex items-baseline justify-between gap-4 px-4 pt-4">
               <p className="text-sm text-muted-foreground">

@@ -84,6 +84,74 @@ export function writeFilterParams(filters: FilterParams): void {
   }
 }
 
+export type ActiveFilterId =
+  | 'query'
+  | 'rating'
+  | 'sort'
+  | 'companySort'
+  | 'timeRange'
+  | 'company'
+  | 'city'
+
+export type ActiveFilterChip = {
+  id: ActiveFilterId
+  label: string
+}
+
+const TIME_RANGE_LABELS: Record<Exclude<TimeRange, 'all' | 'custom'>, string> = {
+  '7d': 'Last 7 days',
+  '30d': 'Last 30 days',
+  '90d': 'Last 3 months',
+  '365d': 'Last year',
+}
+
+export function listActiveFilters(
+  filters: FilterParams,
+  names?: { company?: string },
+): ActiveFilterChip[] {
+  const chips: ActiveFilterChip[] = []
+  if (filters.query) chips.push({ id: 'query', label: filters.query })
+  if (filters.rating !== 'all') chips.push({ id: 'rating', label: `${filters.rating} stars` })
+  if (filters.timeRange === 'custom') {
+    const span = [filters.fromDate, filters.toDate].filter(Boolean).join(' – ')
+    chips.push({ id: 'timeRange', label: span ? `Custom ${span}` : 'Custom range' })
+  } else if (filters.timeRange !== 'all') {
+    chips.push({ id: 'timeRange', label: TIME_RANGE_LABELS[filters.timeRange] })
+  }
+  if (filters.city !== 'all') chips.push({ id: 'city', label: filters.city })
+  if (filters.sort !== 'newest') chips.push({ id: 'sort', label: 'Oldest first' })
+  if (filters.companySort === 'rating-asc') {
+    chips.push({ id: 'companySort', label: 'Rating: low to high' })
+  }
+  if (filters.company !== 'all') {
+    chips.push({ id: 'company', label: names?.company?.trim() || 'Selected shop' })
+  }
+  return chips
+}
+
+export function clearActiveFilter(filters: FilterParams, id: ActiveFilterId): FilterParams {
+  switch (id) {
+    case 'query':
+      return { ...filters, query: '' }
+    case 'rating':
+      return { ...filters, rating: 'all' }
+    case 'sort':
+      return { ...filters, sort: 'newest' }
+    case 'companySort':
+      return { ...filters, companySort: 'rating-desc' }
+    case 'timeRange':
+      return { ...filters, timeRange: 'all', fromDate: '', toDate: '' }
+    case 'company':
+      return { ...filters, company: 'all' }
+    case 'city':
+      return { ...filters, city: 'all' }
+  }
+}
+
+export function resetActiveFilters(): FilterParams {
+  return { ...defaultFilterParams }
+}
+
 function isRating(value: string | null): value is RatingFilter {
   return value != null && RATINGS.has(value as RatingFilter)
 }
