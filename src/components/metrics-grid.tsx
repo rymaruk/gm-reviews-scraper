@@ -1,12 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Loader2Icon, SearchIcon } from 'lucide-react'
+import { DownloadIcon, Loader2Icon, SearchIcon, UploadIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ActiveFiltersPanel } from '@/components/active-filters-panel'
 import { AppHeader } from '@/components/app-nav'
 import { Stars } from '@/components/stars'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -15,7 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { WeightCsvImportDialog } from '@/components/weight-csv-import-dialog'
 import { updateCampaignWeights } from '@/lib/api'
+import { downloadCsv } from '@/lib/csv'
 import {
   campaignCities,
   campaignDisplayName,
@@ -39,9 +42,9 @@ import {
   formatWeight,
   parseWeight,
   roundWeight,
-  validateWeights,
   weightsTotal,
 } from '@/lib/weights'
+import { exportWeightsCsv, planWeightImport, weightsCsvFilename, type WeightImportPlan } from '@/lib/weight-csv'
 
 const AUTOSAVE_MS = 1000
 
@@ -61,6 +64,12 @@ export function MetricsGrid({
   const [editVersion, setEditVersion] = useState(0)
   const draftsRef = useRef(drafts)
   draftsRef.current = drafts
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importRunning, setImportRunning] = useState(false)
+  const [importProgress, setImportProgress] = useState(0)
+  const [importMessage, setImportMessage] = useState('')
+  const [importPlan, setImportPlan] = useState<WeightImportPlan | null>(null)
   const cities = useMemo(() => campaignCities(campaigns), [campaigns])
   const visible = useMemo(() => {
     const query = filter.trim().toLowerCase()
@@ -96,9 +105,7 @@ export function MetricsGrid({
   const numericWeights = parsedWeights.filter((value): value is number => value != null)
   const invalidRow = parsedWeights.some((value) => value == null || value < 0)
   const total = weightsTotal(numericWeights)
-  const validation = validateWeights(numericWeights)
-  const canSave =
-    campaigns.length > 0 && !invalidRow && parsedWeights.length === campaigns.length && validation.ok
+  const totalOk = !invalidRow && Math.abs(total - WEIGHT_TOTAL) <= WEIGHT_EPSILON
   const remaining = roundWeight(WEIGHT_TOTAL - total)
   const dirty = campaigns.some(
     (campaign) => parseWeight(drafts[campaign.id] ?? '') !== roundWeight(campaign.weight),
@@ -106,34 +113,23 @@ export function MetricsGrid({
   const filtersActive = Boolean(filter.trim()) || city !== 'all'
 
   const persistWeights = useCallback(async (nextDrafts: Record<string, string>) => {
-    const rows = campaigns
-      .slice()
-      .sort((left, right) => left.id.localeCompare(right.id))
-    const parsed = rows.map((campaign) => ({
+    const parsed = campaigns.map((campaign) => ({
       id: campaign.id,
       value: parseWeight(nextDrafts[campaign.id] ?? ''),
     }))
-
-    if (parsed.some((item) => item.value == null || item.value < 0)) {
-      toast.error('Each weight must be 0 or greater.')
-      return
-    }
-
-    const weights = parsed.map((item) => ({
-      id: item.id,
-      weight: roundWeight(item.value ?? 0),
-    }))
-    const check = validateWeights(weights.map((item) => item.weight))
-    if (!check.ok) {
-      toast.error(check.error ?? `Weights must add up to ${WEIGHT_TOTAL}%.`)
-      return
-    }
-
-    const unchanged = campaigns.every((campaign) => {
-      const next = weights.find((item) => item.id === campaign.id)
-      return next != null && roundWeight(campaign.weight) === next.weight
+    const invalid = parsed.filter((item) => item.value == null || item.value < 0)
+    const weights = parsed.flatMap((item) => {
+      if (item.value == null || item.value < 0) return []
+      const campaign = campaigns.find((row) => row.id === item.id)
+      const weight = roundWeight(item.value)
+      if (!campaign || roundWeight(campaign.weight) === weight) return []
+      return [{ id: item.id, weight }]
     })
-    if (unchanged) return
+
+    if (weights.length === 0) {
+      if (invalid.length > 0) toast.error('Each weight must be 0 or greater.')
+      return
+    }
 
     setSaving(true)
     try {
@@ -145,10 +141,13 @@ export function MetricsGrid({
         }),
       )
       setDrafts((current) => {
-        const same = rows.every((campaign) => current[campaign.id] === nextDrafts[campaign.id])
-        return same
-          ? Object.fromEntries(weights.map((item) => [item.id, formatWeight(item.weight)]))
-          : current
+        const next = { ...current }
+        for (const item of weights) {
+          if (current[item.id] === nextDrafts[item.id]) {
+            next[item.id] = formatWeight(item.weight)
+          }
+        }
+        return next
       })
       toast.success('Weights updated')
     } catch (error) {
@@ -185,6 +184,53 @@ export function MetricsGrid({
     setDraft(id, formatted)
   }
 
+  function exportCsv() {
+    downloadCsv(weightsCsvFilename(), exportWeightsCsv(campaigns, drafts))
+  }
+
+  async function importCsvFile(file: File) {
+    setImportPlan(null)
+    setImportOpen(true)
+    setImportRunning(true)
+    setImportProgress(15)
+    setImportMessage('Reading file…')
+    try {
+      const text = await file.text()
+      setImportProgress(45)
+      setImportMessage('Matching addresses…')
+      await new Promise((resolve) => window.setTimeout(resolve, 40))
+      const planned = planWeightImport(campaigns, text, drafts)
+      if (planned.canSave) {
+        setImportProgress(75)
+        setImportMessage('Saving weights…')
+        await updateCampaignWeights(planned.weights)
+        const nextCampaigns = campaigns.map((campaign) => {
+          const next = planned.weights.find((item) => item.id === campaign.id)
+          return next ? { ...campaign, weight: next.weight } : campaign
+        })
+        setCampaigns(nextCampaigns)
+        setDrafts(draftsFromCampaigns(nextCampaigns))
+        toast.success('Weights updated')
+      }
+      setImportProgress(100)
+      setImportPlan(planned)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not import CSV.'
+      toast.error(message)
+      setImportPlan({
+        parseError: message,
+        rows: [],
+        weights: [],
+        validation: { ok: false, total: 0, error: message },
+        changedCount: 0,
+        canSave: false,
+      })
+    } finally {
+      setImportRunning(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
   return (
     <div className="flex h-svh flex-col overflow-hidden bg-background">
       <AppHeader current="metrics" />
@@ -192,10 +238,10 @@ export function MetricsGrid({
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
           <div>
-            <h1 className="font-heading text-3xl font-medium">Metric</h1>
+            <h1 className="font-heading text-3xl font-medium">Metrics</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Assign a weight to each shop. Values can be 0 or greater, and the total must be {WEIGHT_TOTAL}%.
-              Changes save automatically when the total is {WEIGHT_TOTAL}%.
+              Assign a weight to each shop. Values can be 0 or greater, and the total should be {WEIGHT_TOTAL}%.
+              Each shop saves automatically after you stop typing.
             </p>
           </div>
 
@@ -210,7 +256,7 @@ export function MetricsGrid({
           ) : (
             <>
               <div className="sticky top-0 z-20 flex flex-col gap-3 bg-background/95 py-3 backdrop-blur-sm">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                   <div className="relative min-w-0 flex-1">
                     <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -234,6 +280,32 @@ export function MetricsGrid({
                       ))}
                     </SelectContent>
                   </Select>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button type="button" variant="outline" onClick={exportCsv} disabled={importRunning}>
+                      <DownloadIcon />
+                      Export CSV
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileRef.current?.click()}
+                      disabled={importRunning}
+                    >
+                      <UploadIcon />
+                      Import CSV
+                    </Button>
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept=".csv,text/csv"
+                      className="sr-only"
+                      aria-label="Import weights CSV"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
+                        if (file) void importCsvFile(file)
+                      }}
+                    />
+                  </div>
                 </div>
                 <ActiveFiltersPanel
                   chips={activeFilterChips}
@@ -337,7 +409,7 @@ export function MetricsGrid({
           <p
             className={cn(
               'text-sm tabular-nums',
-              canSave ? 'text-muted-foreground' : 'text-destructive',
+              totalOk || saving ? 'text-muted-foreground' : 'text-destructive',
             )}
             aria-live="polite"
           >
@@ -345,17 +417,25 @@ export function MetricsGrid({
               ? 'Saving weights…'
               : invalidRow
                 ? 'Each weight must be 0 or greater.'
-                : Math.abs(total - WEIGHT_TOTAL) <= WEIGHT_EPSILON
-                  ? dirty
-                    ? `Total: ${WEIGHT_TOTAL}% · Saving shortly`
-                    : `Total: ${WEIGHT_TOTAL}%`
-                  : remaining > 0
-                    ? `Total: ${formatWeight(total)}% (${formatWeight(remaining)}% remaining)`
-                    : `Total: ${formatWeight(total)}% (${formatWeight(Math.abs(remaining))}% over)`}
+                : `${
+                    totalOk
+                      ? `Total: ${WEIGHT_TOTAL}%`
+                      : remaining > 0
+                        ? `Total: ${formatWeight(total)}% (${formatWeight(remaining)}% remaining)`
+                        : `Total: ${formatWeight(total)}% (${formatWeight(Math.abs(remaining))}% over)`
+                  }${dirty ? ' · Saving shortly' : ''}`}
             {filtersActive ? ` · Showing ${visible.length} of ${campaigns.length}` : null}
           </p>
         </div>
       ) : null}
+      <WeightCsvImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        running={importRunning}
+        progress={importProgress}
+        message={importMessage}
+        plan={importPlan}
+      />
     </div>
   )
 }

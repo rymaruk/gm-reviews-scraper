@@ -1,3 +1,4 @@
+import { normalizeAddress } from '@/lib/place'
 import type { Campaign, StoredReview } from '@/lib/types'
 
 import { getSupabase } from './supabase'
@@ -229,8 +230,4 @@ function isSameCampaign(
     return true
   }
   return false
-}
-
-function normalizeAddress(value: string): string {
-  return value.trim().replace(/\s+/g, ' ').toLowerCase()
 }

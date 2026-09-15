@@ -7,7 +7,7 @@ import { handleCampaigns } from '@/server/handlers'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Metric',
+  title: 'Metrics',
 }
 
 export default async function MetricsPage() {

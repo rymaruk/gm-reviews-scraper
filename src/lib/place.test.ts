@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { cityFromAddress } from './place'
+import { cityFromAddress, normalizeAddress } from './place'
 
 describe('cityFromAddress', () => {
   it('uses the city, not the oblast, from a Ukrainian Maps address', () => {
@@ -20,5 +20,11 @@ describe('cityFromAddress', () => {
 
   it('uses the city when the address is only city and country', () => {
     assert.equal(cityFromAddress('Kyiv, Ukraine'), 'Kyiv')
+  })
+})
+
+describe('normalizeAddress', () => {
+  it('trims, collapses whitespace, and ignores case', () => {
+    assert.equal(normalizeAddress('  Lutsk,   Ukraine '), 'lutsk, ukraine')
   })
 })

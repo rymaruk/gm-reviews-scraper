@@ -2,7 +2,7 @@ import { placeNameFromMapsUrl, preferName } from '@/lib/place'
 import { campaignIdentity } from '@/lib/reviews'
 import { scrapeLimitMessage, wasScrapedToday } from '@/lib/scrape'
 import type { Campaign } from '@/lib/types'
-import { parseWeight, roundWeight, validateWeights } from '@/lib/weights'
+import { parseWeight, roundWeight } from '@/lib/weights'
 
 import {
   deleteCampaign,
@@ -41,10 +41,11 @@ export async function handleUpdateCampaignWeights(body: unknown): Promise<ApiRes
   const payload = asRecord(body)
   const items = Array.isArray(payload.weights) ? payload.weights : []
   if (items.length === 0) {
-    return { status: 400, body: { error: 'Weights are required for every shop.' } }
+    return { status: 400, body: { error: 'At least one shop weight is required.' } }
   }
 
   const parsed: Array<{ id: string; weight: number }> = []
+  const seen = new Set<string>()
   for (const item of items) {
     const row = asRecord(item)
     const id = optionalString(row.id)
@@ -53,7 +54,14 @@ export async function handleUpdateCampaignWeights(body: unknown): Promise<ApiRes
     if (!id || weight == null || !Number.isFinite(weight) || weight < 0) {
       return { status: 400, body: { error: 'Each weight must be 0 or greater.' } }
     }
-    parsed.push({ id, weight: roundWeight(weight) })
+    const next = { id, weight: roundWeight(weight) }
+    if (seen.has(id)) {
+      const index = parsed.findIndex((entry) => entry.id === id)
+      parsed[index] = next
+    } else {
+      seen.add(id)
+      parsed.push(next)
+    }
   }
 
   try {
@@ -67,18 +75,8 @@ export async function handleUpdateCampaignWeights(body: unknown): Promise<ApiRes
       return { status: 400, body: { error: 'One or more campaigns were not found.' } }
     }
 
-    const submittedIds = new Set(parsed.map((item) => item.id))
-    if (campaigns.some((campaign) => !submittedIds.has(campaign.id))) {
-      return { status: 400, body: { error: 'Weights must be provided for every shop.' } }
-    }
-
-    const validation = validateWeights(parsed.map((item) => item.weight))
-    if (!validation.ok) {
-      return { status: 400, body: { error: validation.error, total: validation.total } }
-    }
-
     await updateCampaignWeights(parsed)
-    return { status: 200, body: { ok: true, total: validation.total } }
+    return { status: 200, body: { ok: true, weights: parsed } }
   } catch (error) {
     return { status: 502, body: { error: toErrorMessage(error) } }
   }

@@ -98,6 +98,10 @@ const COUNTRIES = new Set(
   ].map((name) => name.toLowerCase()),
 )
 
+export function normalizeAddress(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
 export function cityFromAddress(address?: string): string | undefined {
   if (!address?.trim()) return undefined
 
