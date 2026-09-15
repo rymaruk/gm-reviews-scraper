@@ -35,6 +35,13 @@ Open [http://localhost:3000](http://localhost:3000). The App Router serves both 
 
 ## Vercel
 
+This is a Next.js app (`vercel.json` sets `"framework": "nextjs"`). If Project Settings still use the old Vite values, they override the repo file — update **Vercel → Project → Settings → Build & Development Settings**:
+
+- **Framework Preset** = Next.js
+- **Output Directory** = empty (clear `dist`; Next.js does not use `dist`)
+
+Then save and **Redeploy**.
+
 Local `.env.local` is not deployed. Add the same keys in **Vercel → Project → Settings → Environment Variables** for **Production** (and Preview if you use it), then **Redeploy**:
 
 - `SERPAPI_KEY`
