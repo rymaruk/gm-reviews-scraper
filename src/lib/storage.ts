@@ -9,6 +9,7 @@ export function loadCampaigns(): Campaign[] {
     ...campaign,
     title: campaignDisplayName(campaign),
     scrapeStatus: campaign.scrapeStatus === 'scraping' ? 'idle' : campaign.scrapeStatus,
+    weight: Number.isFinite(campaign.weight) ? campaign.weight : 0,
   }))
 }
 

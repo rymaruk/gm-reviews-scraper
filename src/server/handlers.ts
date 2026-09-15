@@ -2,6 +2,7 @@ import { placeNameFromMapsUrl, preferName } from '@/lib/place'
 import { campaignIdentity } from '@/lib/reviews'
 import { scrapeLimitMessage, wasScrapedToday } from '@/lib/scrape'
 import type { Campaign } from '@/lib/types'
+import { parseWeight, roundWeight, validateWeights } from '@/lib/weights'
 
 import {
   deleteCampaign,
@@ -9,6 +10,7 @@ import {
   getCampaign,
   listCampaigns,
   listReviews,
+  updateCampaignWeights,
   upsertCampaign,
   upsertReviews,
 } from './db'
@@ -21,6 +23,62 @@ export async function handleStore(): Promise<ApiResult> {
   try {
     const [campaigns, reviews] = await Promise.all([listCampaigns(), listReviews()])
     return { status: 200, body: { campaigns, reviews } }
+  } catch (error) {
+    return { status: 502, body: { error: toErrorMessage(error) } }
+  }
+}
+
+export async function handleCampaigns(): Promise<ApiResult> {
+  try {
+    const campaigns = await listCampaigns()
+    return { status: 200, body: { campaigns } }
+  } catch (error) {
+    return { status: 502, body: { error: toErrorMessage(error) } }
+  }
+}
+
+export async function handleUpdateCampaignWeights(body: unknown): Promise<ApiResult> {
+  const payload = asRecord(body)
+  const items = Array.isArray(payload.weights) ? payload.weights : []
+  if (items.length === 0) {
+    return { status: 400, body: { error: 'Weights are required for every shop.' } }
+  }
+
+  const parsed: Array<{ id: string; weight: number }> = []
+  for (const item of items) {
+    const row = asRecord(item)
+    const id = optionalString(row.id)
+    const weight =
+      typeof row.weight === 'number' ? row.weight : parseWeight(String(row.weight ?? ''))
+    if (!id || weight == null || !Number.isFinite(weight) || weight < 0) {
+      return { status: 400, body: { error: 'Each weight must be 0 or greater.' } }
+    }
+    parsed.push({ id, weight: roundWeight(weight) })
+  }
+
+  try {
+    const campaigns = await listCampaigns()
+    if (campaigns.length === 0) {
+      return { status: 400, body: { error: 'No campaigns to update.' } }
+    }
+
+    const campaignIds = new Set(campaigns.map((campaign) => campaign.id))
+    if (parsed.some((item) => !campaignIds.has(item.id))) {
+      return { status: 400, body: { error: 'One or more campaigns were not found.' } }
+    }
+
+    const submittedIds = new Set(parsed.map((item) => item.id))
+    if (campaigns.some((campaign) => !submittedIds.has(campaign.id))) {
+      return { status: 400, body: { error: 'Weights must be provided for every shop.' } }
+    }
+
+    const validation = validateWeights(parsed.map((item) => item.weight))
+    if (!validation.ok) {
+      return { status: 400, body: { error: validation.error, total: validation.total } }
+    }
+
+    await updateCampaignWeights(parsed)
+    return { status: 200, body: { ok: true, total: validation.total } }
   } catch (error) {
     return { status: 502, body: { error: toErrorMessage(error) } }
   }
@@ -122,6 +180,7 @@ export async function handleResolvePlace(body: unknown): Promise<ApiResult> {
       lastScrapedAt: new Date().toISOString(),
       scrapeStatus: page.nextPageToken ? 'scraping' : 'done',
       nextPageToken: page.nextPageToken,
+      weight: 0,
     }
 
     await upsertCampaign(campaign)
@@ -183,6 +242,7 @@ export async function handleReviews(body: unknown): Promise<ApiResult> {
         lastScrapedAt: new Date().toISOString(),
         scrapeStatus: scrapeStatus ?? (page.nextPageToken ? 'scraping' : 'done'),
         nextPageToken: page.nextPageToken,
+        weight: existing?.weight ?? 0,
       }
 
       await upsertCampaign(campaign)

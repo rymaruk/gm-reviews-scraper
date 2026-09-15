@@ -27,6 +27,22 @@ export async function fetchStore(): Promise<{ campaigns: Campaign[]; reviews: St
   return parseJson(response)
 }
 
+export async function fetchCampaigns(): Promise<{ campaigns: Campaign[] }> {
+  const response = await fetch('/api/campaigns', { cache: 'no-store' })
+  return parseJson(response)
+}
+
+export async function updateCampaignWeights(
+  weights: Array<{ id: string; weight: number }>,
+): Promise<void> {
+  const response = await fetch('/api/campaigns/weights', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ weights }),
+  })
+  await parseJson(response)
+}
+
 export async function resolvePlace(url: string): Promise<{
   url: string
   resolvedUrl: string

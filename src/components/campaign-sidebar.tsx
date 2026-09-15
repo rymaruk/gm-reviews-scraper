@@ -14,6 +14,7 @@ import {
   Trash2Icon,
 } from 'lucide-react'
 
+import { AppNav } from '@/components/app-nav'
 import { Stars } from '@/components/stars'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -91,7 +92,12 @@ export function CampaignSidebar({
   return (
     <aside className="flex h-full w-80 shrink-0 flex-col border-r bg-sidebar">
       <div className="flex items-center justify-between gap-2 px-4 py-4">
-        <h1 className="font-heading text-lg font-medium">GoogleMap Reviews</h1>
+        <div className="min-w-0">
+          <h1 className="font-heading text-lg font-medium">GoogleMap Reviews</h1>
+          <div className="mt-1">
+            <AppNav current="reviews" />
+          </div>
+        </div>
         <div className="flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>

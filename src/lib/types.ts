@@ -47,6 +47,7 @@ export type Campaign = {
   scrapeStatus: 'idle' | 'scraping' | 'done' | 'error'
   scrapeError?: string
   nextPageToken?: string
+  weight: number
 }
 
 export type StoredReview = Review & {

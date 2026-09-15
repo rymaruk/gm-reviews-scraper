@@ -20,6 +20,7 @@ type CampaignRow = {
   scrape_status: Campaign['scrapeStatus']
   scrape_error: string | null
   next_page_token: string | null
+  weight: number
 }
 
 type ReviewRow = {
@@ -95,6 +96,16 @@ export async function deleteCampaign(id: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+export async function updateCampaignWeights(
+  weights: Array<{ id: string; weight: number }>,
+): Promise<void> {
+  const supabase = getSupabase()
+  for (const item of weights) {
+    const { error } = await supabase.from('campaigns').update({ weight: item.weight }).eq('id', item.id)
+    if (error) throw new Error(error.message)
+  }
+}
+
 async function fetchAll<T>(table: 'campaigns' | 'reviews', orderColumn: string): Promise<T[]> {
   const supabase = getSupabase()
   const rows: T[] = []
@@ -134,6 +145,7 @@ function toCampaignRow(campaign: Campaign): CampaignRow {
     scrape_status: campaign.scrapeStatus,
     scrape_error: campaign.scrapeError ?? null,
     next_page_token: campaign.nextPageToken ?? null,
+    weight: campaign.weight,
   }
 }
 
@@ -154,7 +166,13 @@ function fromCampaignRow(row: CampaignRow): Campaign {
     scrapeStatus: row.scrape_status === 'scraping' ? 'idle' : row.scrape_status,
     scrapeError: row.scrape_error ?? undefined,
     nextPageToken: row.next_page_token ?? undefined,
+    weight: asWeight(row.weight),
   }
+}
+
+function asWeight(value: unknown): number {
+  const weight = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(weight) ? weight : 0
 }
 
 function toReviewRow(review: StoredReview): ReviewRow {

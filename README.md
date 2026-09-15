@@ -19,7 +19,7 @@ SUPABASE_PUBLISHABLE_KEY=
 npm install
 ```
 
-3. Apply the database schema (once):
+3. Apply the database schema (once). Run the same command again after pulling new migrations so `campaigns.weight` exists for the Metric page:
 
 ```bash
 npx supabase db push --db-url "postgresql://postgres:[DB_PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres"
@@ -56,6 +56,7 @@ The API lives in Next.js Route Handlers under `src/app/api/`. Scraped campaigns 
 1. Click **Add** and paste Google Maps shop URLs (one per line).
 2. The scraper saves each shop and every review page to Supabase.
 3. Reload the app on any device — the same data comes back from the database.
+4. Open **Metric** (`/metrics`) to edit each shop’s weight. Values must be 0 or greater and add up to 100% before they can be saved.
 
 ## Notes
 
