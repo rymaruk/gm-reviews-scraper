@@ -60,122 +60,151 @@ export function exportWeightsCsv(
   return stringifyCsv(rows)
 }
 
-export function planWeightImport(
-  campaigns: Campaign[],
-  csvText: string,
-  drafts?: Record<string, string>,
-): WeightImportPlan {
+export type WeightCsvRecord = {
+  line: number
+  address: string
+  weight: string
+}
+
+export function parseWeightCsvRows(csvText: string): {
+  parseError?: string
+  records: WeightCsvRecord[]
+} {
   const table = parseCsv(csvText)
   if (table.length === 0) {
-    return emptyPlan('CSV is empty.')
+    return { parseError: 'CSV is empty.', records: [] }
   }
 
   const headers = table[0].map((cell) => normalizeHeader(cell))
   const addressIndex = headerIndex(headers, ADDRESS_HEADERS)
   const weightIndex = headerIndex(headers, WEIGHT_HEADERS)
   if (addressIndex < 0 || weightIndex < 0) {
-    return emptyPlan('CSV must include Address and Weight columns.')
+    return { parseError: 'CSV must include Address and Weight columns.', records: [] }
   }
 
+  return {
+    records: table.slice(1).map((cells, offset) => ({
+      line: offset + 2,
+      address: (cells[addressIndex] ?? '').trim(),
+      weight: (cells[weightIndex] ?? '').trim(),
+    })),
+  }
+}
+
+export function createWeightImportState(
+  campaigns: Campaign[],
+  drafts?: Record<string, string>,
+) {
   const index = indexCampaigns(campaigns)
   const seen = new Map<string, number>()
   const nextWeights = new Map(
     campaigns.map((campaign) => [campaign.id, currentNumericWeight(campaign, drafts)]),
   )
-  const rows: WeightImportRow[] = []
 
-  table.slice(1).forEach((cells, offset) => {
-    const line = offset + 2
-    const address = (cells[addressIndex] ?? '').trim()
-    const weightRaw = (cells[weightIndex] ?? '').trim()
+  function process(record: WeightCsvRecord): WeightImportRow {
+    const { line, address, weight: weightRaw } = record
     if (!address) {
-      rows.push({
+      return {
         line,
         address,
         weight: weightRaw,
         status: 'empty_address',
         reason: 'Missing address.',
-      })
-      return
+      }
     }
 
     const key = normalizeAddress(address)
     const previousLine = seen.get(key)
     if (previousLine != null) {
-      rows.push({
+      return {
         line,
         address,
         weight: weightRaw,
         status: 'duplicate',
         reason: `Duplicate address (already seen on row ${previousLine}).`,
-      })
-      return
+      }
     }
     seen.set(key, line)
 
     const weight = parseCsvWeight(weightRaw)
     if (weight == null || weight < 0) {
-      rows.push({
+      return {
         line,
         address,
         weight: weightRaw,
         status: 'invalid_weight',
         reason: 'Weight must be 0 or greater.',
-      })
-      return
+      }
     }
 
     const matches = index.get(key) ?? []
     if (matches.length === 0) {
-      rows.push({
+      return {
         line,
         address,
         weight: weightRaw,
         status: 'not_found',
         reason: 'Address was not found.',
-      })
-      return
+      }
     }
     if (matches.length > 1) {
-      rows.push({
+      return {
         line,
         address,
         weight: weightRaw,
         status: 'ambiguous',
         reason: 'Multiple shops share this address.',
-      })
-      return
+      }
     }
 
     const campaign = matches[0]
     const rounded = roundWeight(weight)
     const unchanged = rounded === nextWeights.get(campaign.id)
     nextWeights.set(campaign.id, rounded)
-    rows.push({
+    return {
       line,
       address,
       weight: formatWeight(rounded),
       status: unchanged ? 'unchanged' : 'updated',
       reason: unchanged ? 'Weight already matches.' : 'Updated.',
       campaignId: campaign.id,
-    })
-  })
+    }
+  }
 
-  const merged = campaigns.map((campaign) => ({
-    id: campaign.id,
-    weight: nextWeights.get(campaign.id) ?? 0,
-  }))
-  const validation = validateWeights(merged.map((item) => item.weight))
-  const weights = rows
-    .filter((row) => row.status === 'updated' && row.campaignId)
-    .map((row) => ({
-      id: row.campaignId as string,
-      weight: nextWeights.get(row.campaignId as string) ?? 0,
+  function finish(rows: WeightImportRow[]): WeightImportPlan {
+    const merged = campaigns.map((campaign) => ({
+      id: campaign.id,
+      weight: nextWeights.get(campaign.id) ?? 0,
     }))
-  const changedCount = weights.length
-  const canSave = changedCount > 0
+    const validation = validateWeights(merged.map((item) => item.weight))
+    const weights = rows
+      .filter((row) => row.status === 'updated' && row.campaignId)
+      .map((row) => ({
+        id: row.campaignId as string,
+        weight: nextWeights.get(row.campaignId as string) ?? 0,
+      }))
+    return {
+      rows,
+      weights,
+      validation,
+      changedCount: weights.length,
+      canSave: weights.length > 0,
+    }
+  }
 
-  return { rows, weights, validation, changedCount, canSave }
+  return { process, finish }
+}
+
+export function planWeightImport(
+  campaigns: Campaign[],
+  csvText: string,
+  drafts?: Record<string, string>,
+): WeightImportPlan {
+  const parsed = parseWeightCsvRows(csvText)
+  if (parsed.parseError) return emptyImportPlan(parsed.parseError)
+  const importer = createWeightImportState(campaigns, drafts)
+  const rows = parsed.records.map((record) => importer.process(record))
+  return importer.finish(rows)
 }
 
 export function importCounts(rows: WeightImportRow[]): { updated: number; notUpdated: number } {
@@ -204,7 +233,7 @@ export function statusLabel(status: WeightImportStatus): string {
   }
 }
 
-function emptyPlan(parseError: string): WeightImportPlan {
+export function emptyImportPlan(parseError: string): WeightImportPlan {
   return {
     parseError,
     rows: [],

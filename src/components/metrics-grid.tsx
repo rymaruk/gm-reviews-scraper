@@ -44,7 +44,7 @@ import {
   roundWeight,
   weightsTotal,
 } from '@/lib/weights'
-import { exportWeightsCsv, planWeightImport, weightsCsvFilename, type WeightImportPlan } from '@/lib/weight-csv'
+import { exportWeightsCsv, weightsCsvFilename } from '@/lib/weight-csv'
 
 const AUTOSAVE_MS = 1000
 
@@ -64,12 +64,7 @@ export function MetricsGrid({
   const [editVersion, setEditVersion] = useState(0)
   const draftsRef = useRef(drafts)
   draftsRef.current = drafts
-  const fileRef = useRef<HTMLInputElement>(null)
   const [importOpen, setImportOpen] = useState(false)
-  const [importRunning, setImportRunning] = useState(false)
-  const [importProgress, setImportProgress] = useState(0)
-  const [importMessage, setImportMessage] = useState('')
-  const [importPlan, setImportPlan] = useState<WeightImportPlan | null>(null)
   const cities = useMemo(() => campaignCities(campaigns), [campaigns])
   const visible = useMemo(() => {
     const query = filter.trim().toLowerCase()
@@ -188,47 +183,20 @@ export function MetricsGrid({
     downloadCsv(weightsCsvFilename(), exportWeightsCsv(campaigns, drafts))
   }
 
-  async function importCsvFile(file: File) {
-    setImportPlan(null)
-    setImportOpen(true)
-    setImportRunning(true)
-    setImportProgress(15)
-    setImportMessage('Reading file…')
-    try {
-      const text = await file.text()
-      setImportProgress(45)
-      setImportMessage('Matching addresses…')
-      await new Promise((resolve) => window.setTimeout(resolve, 40))
-      const planned = planWeightImport(campaigns, text, drafts)
-      if (planned.canSave) {
-        setImportProgress(75)
-        setImportMessage('Saving weights…')
-        await updateCampaignWeights(planned.weights)
-        const nextCampaigns = campaigns.map((campaign) => {
-          const next = planned.weights.find((item) => item.id === campaign.id)
-          return next ? { ...campaign, weight: next.weight } : campaign
-        })
-        setCampaigns(nextCampaigns)
-        setDrafts(draftsFromCampaigns(nextCampaigns))
-        toast.success('Weights updated')
+  function applyImportedWeights(weights: Array<{ id: string; weight: number }>) {
+    setCampaigns((current) =>
+      current.map((campaign) => {
+        const next = weights.find((item) => item.id === campaign.id)
+        return next ? { ...campaign, weight: next.weight } : campaign
+      }),
+    )
+    setDrafts((current) => {
+      const next = { ...current }
+      for (const item of weights) {
+        next[item.id] = formatWeight(item.weight)
       }
-      setImportProgress(100)
-      setImportPlan(planned)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not import CSV.'
-      toast.error(message)
-      setImportPlan({
-        parseError: message,
-        rows: [],
-        weights: [],
-        validation: { ok: false, total: 0, error: message },
-        changedCount: 0,
-        canSave: false,
-      })
-    } finally {
-      setImportRunning(false)
-      if (fileRef.current) fileRef.current.value = ''
-    }
+      return next
+    })
   }
 
   return (
@@ -281,30 +249,14 @@ export function MetricsGrid({
                     </SelectContent>
                   </Select>
                   <div className="flex shrink-0 items-center gap-2">
-                    <Button type="button" variant="outline" onClick={exportCsv} disabled={importRunning}>
+                    <Button type="button" variant="outline" onClick={exportCsv}>
                       <DownloadIcon />
                       Export CSV
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => fileRef.current?.click()}
-                      disabled={importRunning}
-                    >
+                    <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
                       <UploadIcon />
                       Import CSV
                     </Button>
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      accept=".csv,text/csv"
-                      className="sr-only"
-                      aria-label="Import weights CSV"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0]
-                        if (file) void importCsvFile(file)
-                      }}
-                    />
                   </div>
                 </div>
                 <ActiveFiltersPanel
@@ -431,10 +383,9 @@ export function MetricsGrid({
       <WeightCsvImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
-        running={importRunning}
-        progress={importProgress}
-        message={importMessage}
-        plan={importPlan}
+        campaigns={campaigns}
+        drafts={drafts}
+        onImported={applyImportedWeights}
       />
     </div>
   )
