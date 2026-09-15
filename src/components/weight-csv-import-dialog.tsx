@@ -53,7 +53,6 @@ export function WeightCsvImportDialog({
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [message, setMessage] = useState('')
-  const [total, setTotal] = useState(0)
   const [plan, setPlan] = useState<WeightImportPlan | null>(null)
   const [previewRows, setPreviewRows] = useState<WeightImportRow[]>([])
 
@@ -70,7 +69,6 @@ export function WeightCsvImportDialog({
       setRunning(false)
       setProgress(0)
       setMessage('')
-      setTotal(0)
       setPlan(null)
       setPreviewRows([])
       if (fileRef.current) fileRef.current.value = ''
@@ -97,7 +95,6 @@ export function WeightCsvImportDialog({
     setPreviewRows([])
     setRunning(true)
     setProgress(4)
-    setTotal(0)
     setMessage('Reading file…')
     try {
       const text = await file.text()
@@ -112,7 +109,6 @@ export function WeightCsvImportDialog({
 
       const importer = createWeightImportState(campaigns, drafts)
       const nextRows: WeightImportRow[] = []
-      setTotal(parsed.records.length)
       setMessage(
         parsed.records.length === 0 ? 'No data rows in the CSV.' : 'Validating shops…',
       )
