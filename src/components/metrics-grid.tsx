@@ -608,6 +608,7 @@ function MetricsTotalsPanel({
 function WeightedDaysTile({ lastReview }: { lastReview: LastReviewItem | null }) {
   const days = lastReview?.daysAgo
   const daysLabel = days == null ? '—' : String(Math.max(0, days))
+  const todayLabel = formatLastReviewDate(todayIsoDay())
 
   return (
     <div className="col-span-2 rounded-xl bg-amber-400/15 px-3 py-2 ring-1 ring-amber-400/35 lg:col-span-1">
@@ -615,12 +616,20 @@ function WeightedDaysTile({ lastReview }: { lastReview: LastReviewItem | null })
         <CalendarDaysIcon className="size-3.5 shrink-0" aria-hidden />
         <p className="min-w-0 flex-1 text-[11px] tracking-wide uppercase">Weighted days</p>
         <InfoTip label="Weighted days" side="left">
-          Whole days between today and the newest last review among all shops. That review is shown
-          below. Open the link to read it on the Reviews page.
+          Whole days between today and the newest last review among all shops. Today is the current
+          calendar date. That last review is shown below.
         </InfoTip>
       </div>
-      <p className="mt-0.5 font-heading text-lg font-medium tabular-nums">{daysLabel}</p>
-      <p className="text-[11px] text-muted-foreground">Days since last review</p>
+      <div className="mt-0.5 flex items-start justify-between gap-3">
+        <div>
+          <p className="font-heading text-lg font-medium tabular-nums">{daysLabel}</p>
+          <p className="text-[11px] text-muted-foreground">Days since last review</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[11px] tracking-wide text-muted-foreground uppercase">Today</p>
+          <p className="text-sm tabular-nums">{todayLabel}</p>
+        </div>
+      </div>
 
       {lastReview ? (
         <Link
@@ -690,6 +699,13 @@ function SummaryTile({
       {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
     </div>
   )
+}
+
+function todayIsoDay(now = new Date()): string {
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function InfoTip({
