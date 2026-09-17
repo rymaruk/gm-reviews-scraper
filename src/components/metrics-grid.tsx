@@ -589,6 +589,8 @@ function MetricsTotalsPanel({
           label="Weighted rating"
           value={weightedRating != null ? formatWeightedAverage(weightedRating) : '—'}
           hint="Google Maps, by share"
+          formula="SUMPRODUCT(share, rating) / SUM(share)"
+          info="Each shop’s Google Maps rating is multiplied by its share, then those products are added up and divided by the sum of shares. A shop with 40% share counts four times as much as a shop with 10%. Shops with 0% share are skipped."
           highlight
         />
         <WeightedDaysTile lastReview={lastReview} />
@@ -661,6 +663,8 @@ function SummaryTile({
   label,
   value,
   hint,
+  formula,
+  info,
   icon: Icon,
   iconClassName,
   highlight = false,
@@ -670,6 +674,8 @@ function SummaryTile({
   label: string
   value: string
   hint?: string
+  formula?: string
+  info?: string
   icon: ComponentType<SVGProps<SVGSVGElement>>
   iconClassName?: string
   highlight?: boolean
@@ -686,7 +692,12 @@ function SummaryTile({
     >
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <Icon className={cn('size-3.5 shrink-0', iconClassName)} aria-hidden />
-        <p className="text-[11px] tracking-wide uppercase">{label}</p>
+        <p className="min-w-0 flex-1 text-[11px] tracking-wide uppercase">{label}</p>
+        {info ? (
+          <InfoTip label={label} side="left">
+            {info}
+          </InfoTip>
+        ) : null}
       </div>
       <p
         className={cn(
@@ -697,6 +708,7 @@ function SummaryTile({
         {value}
       </p>
       {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
+      {formula ? <p className="text-[11px] text-muted-foreground">{formula}</p> : null}
     </div>
   )
 }
