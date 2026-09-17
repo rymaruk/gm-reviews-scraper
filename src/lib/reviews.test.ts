@@ -11,12 +11,17 @@ import {
 describe('buildCampaignReviewStats', () => {
   it('counts reviews and keeps the newest iso date per shop', () => {
     const stats = buildCampaignReviewStats([
-      { campaignId: 'a', isoDate: '2026-08-19T10:00:00.000Z' },
-      { campaignId: 'a', isoDate: '2026-08-01T10:00:00.000Z' },
+      { campaignId: 'a', isoDate: '2026-08-19T10:00:00.000Z', snippet: 'Fresh bread today', rating: 5 },
+      { campaignId: 'a', isoDate: '2026-08-01T10:00:00.000Z', snippet: 'Older visit', rating: 3 },
       { campaignId: 'b', isoDate: '2026-07-20T08:00:00.000Z' },
       { campaignId: 'b' },
     ])
-    assert.deepEqual(stats.a, { count: 2, lastReviewAt: '2026-08-19T10:00:00.000Z' })
+    assert.deepEqual(stats.a, {
+      count: 2,
+      lastReviewAt: '2026-08-19T10:00:00.000Z',
+      lastSnippet: 'Fresh bread today',
+      lastRating: 5,
+    })
     assert.deepEqual(stats.b, { count: 2, lastReviewAt: '2026-07-20T08:00:00.000Z' })
   })
 })

@@ -57,6 +57,8 @@ export type StoredReview = Review & {
 export type CampaignReviewStats = {
   count: number
   lastReviewAt: string | null
+  lastSnippet?: string
+  lastRating?: number
 }
 
 export type ReviewsPage = {

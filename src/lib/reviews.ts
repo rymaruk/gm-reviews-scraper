@@ -123,9 +123,20 @@ export function formatCampaignRating(rating: number): string {
 }
 
 export function buildCampaignReviewStats(
-  reviews: Array<{ campaignId: string; isoDate?: string | null }>,
+  reviews: Array<{
+    campaignId: string
+    isoDate?: string | null
+    snippet?: string | null
+    rating?: number | null
+  }>,
 ): Record<string, CampaignReviewStats> {
-  const stats: Record<string, { count: number; lastReviewAt: string | null; lastTime: number }> = {}
+  const stats: Record<string, {
+    count: number
+    lastReviewAt: string | null
+    lastTime: number
+    lastSnippet?: string
+    lastRating?: number
+  }> = {}
 
   for (const review of reviews) {
     const current = stats[review.campaignId] ?? {
@@ -138,12 +149,22 @@ export function buildCampaignReviewStats(
     if (Number.isFinite(time) && time >= current.lastTime) {
       current.lastTime = time
       current.lastReviewAt = review.isoDate ?? null
+      const snippet = review.snippet?.trim()
+      if (snippet) current.lastSnippet = snippet
+      else delete current.lastSnippet
+      if (review.rating != null && Number.isFinite(review.rating)) current.lastRating = review.rating
+      else delete current.lastRating
     }
     stats[review.campaignId] = current
   }
 
   return Object.fromEntries(
-    Object.entries(stats).map(([id, value]) => [id, { count: value.count, lastReviewAt: value.lastReviewAt }]),
+    Object.entries(stats).map(([id, value]) => {
+      const next: CampaignReviewStats = { count: value.count, lastReviewAt: value.lastReviewAt }
+      if (value.lastSnippet) next.lastSnippet = value.lastSnippet
+      if (value.lastRating != null) next.lastRating = value.lastRating
+      return [id, next]
+    }),
   )
 }
 

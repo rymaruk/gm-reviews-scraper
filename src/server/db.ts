@@ -101,20 +101,35 @@ export async function deleteCampaign(id: string): Promise<void> {
 
 export async function listCampaignReviewStats(): Promise<Record<string, CampaignReviewStats>> {
   const supabase = getSupabase()
-  const rows: Array<{ campaignId: string; isoDate?: string | null }> = []
+  const rows: Array<{
+    campaignId: string
+    isoDate?: string | null
+    snippet?: string | null
+    rating?: number | null
+  }> = []
   let from = 0
 
   while (true) {
     const { data, error } = await supabase
       .from('reviews')
-      .select('campaign_id, iso_date')
+      .select('campaign_id, iso_date, snippet, rating')
       .order('iso_date', { ascending: false, nullsFirst: false })
       .range(from, from + PAGE_SIZE - 1)
 
     if (error) throw new Error(error.message)
-    const page = (data ?? []) as Array<{ campaign_id: string; iso_date: string | null }>
+    const page = (data ?? []) as Array<{
+      campaign_id: string
+      iso_date: string | null
+      snippet: string | null
+      rating: number | null
+    }>
     for (const row of page) {
-      rows.push({ campaignId: row.campaign_id, isoDate: row.iso_date })
+      rows.push({
+        campaignId: row.campaign_id,
+        isoDate: row.iso_date,
+        snippet: row.snippet,
+        rating: row.rating,
+      })
     }
     if (page.length < PAGE_SIZE) break
     from += PAGE_SIZE
