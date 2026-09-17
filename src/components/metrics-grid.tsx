@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   CalendarDaysIcon,
   DownloadIcon,
+  InfoIcon,
   Loader2Icon,
   MapPinIcon,
   MessageSquareIcon,
@@ -29,6 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ShareCsvImportDialog } from '@/components/share-csv-import-dialog'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { updateCampaignShares } from '@/lib/api'
 import { downloadCsv } from '@/lib/csv'
 import {
@@ -253,7 +255,14 @@ export function MetricsGrid({
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
           <div>
             <MetricsBreadcrumb />
-            <h1 className="font-heading text-3xl font-medium">Metrics</h1>
+            <h1 className="flex items-center gap-2 font-heading text-3xl font-medium">
+              Metrics
+              <InfoTip label="Metrics">
+                Assign each shop a share of the chain. Totals on the right use those shares to
+                weight Google Maps ratings and days since the last review, the same way Excel
+                SUMPRODUCT does.
+              </InfoTip>
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Assign a share to each shop. Values can be 0 or greater, and the total should be {SHARE_TOTAL}%.
               Each shop saves automatically after you stop typing.
@@ -295,6 +304,10 @@ export function MetricsGrid({
                       ))}
                     </SelectContent>
                   </Select>
+                  <InfoTip label="Filters">
+                    Search and city only hide rows in the list. Share total, weighted rating, weighted
+                    days, and review count still include every shop.
+                  </InfoTip>
                   <div className="flex shrink-0 items-center gap-2">
                     <Button type="button" variant="outline" onClick={exportCsv}>
                       <DownloadIcon />
@@ -304,6 +317,10 @@ export function MetricsGrid({
                       <UploadIcon />
                       Import CSV
                     </Button>
+                    <InfoTip label="CSV">
+                      Export downloads Address and Share for every shop. Import matches shops by
+                      address and still accepts older Weight column headers.
+                    </InfoTip>
                   </div>
                 </div>
                 <ActiveFiltersPanel
@@ -322,11 +339,29 @@ export function MetricsGrid({
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 z-10 bg-muted/90 text-left text-xs tracking-wide text-muted-foreground uppercase backdrop-blur-sm">
                       <tr>
-                        <th className="px-4 py-3 font-semibold">Address</th>
-                        <th className="w-40 px-4 py-3 font-semibold">Last review</th>
-                        <th className="w-32 px-4 py-3 text-right font-semibold">Reviews</th>
+                        <th className="px-4 py-3 font-semibold">
+                          <HeaderLabel align="left" label="Address" info="Shop name and Google Maps address. Stars are the shop’s current Google Maps rating." />
+                        </th>
+                        <th className="w-40 px-4 py-3 font-semibold">
+                          <HeaderLabel
+                            align="left"
+                            label="Last review"
+                            info="Date of the newest scraped review for this shop, and how many days ago that was."
+                          />
+                        </th>
+                        <th className="w-36 px-4 py-3 text-right font-semibold">
+                          <HeaderLabel
+                            align="right"
+                            label="Reviews"
+                            info="How many reviews are stored for this shop. Click the number to open all of that shop’s reviews."
+                          />
+                        </th>
                         <th className="sticky top-0 right-0 z-20 w-44 bg-muted/90 px-4 py-3 text-right font-semibold shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]">
-                          Share
+                          <HeaderLabel
+                            align="right"
+                            label="Share"
+                            info="This shop’s portion of the chain, as a percent. Values must be 0 or greater and should add up to 100%. Each edit saves automatically."
+                          />
                         </th>
                       </tr>
                     </thead>
@@ -501,7 +536,13 @@ function MetricsTotalsPanel({
     >
       <div className="flex items-start justify-between gap-2 border-b px-4 py-3">
         <div>
-          <h2 className="font-heading text-sm font-medium">Totals</h2>
+          <h2 className="flex items-center gap-1.5 font-heading text-sm font-medium">
+            Totals
+            <InfoTip label="Totals" side="left">
+              Live results for every shop. Yellow tiles are share-weighted averages:
+              SUMPRODUCT(share, value) divided by the sum of shares. Shops with 0% share are skipped.
+            </InfoTip>
+          </h2>
           <p className="text-[11px] text-muted-foreground">
             SUMPRODUCT(share, value) / Σ share
           </p>
@@ -517,15 +558,23 @@ function MetricsTotalsPanel({
         <SummaryTile
           icon={PercentIcon}
           label="Share total"
+          info="Sum of every shop’s share. It should equal 100%. Remaining or over shows how far the current values are from that target."
           value={`${formatShare(total)}%`}
           hint={shareHint}
           tone={totalOk || saving ? 'default' : 'danger'}
         />
-        <SummaryTile icon={MapPinIcon} label="Shops" value={String(shops)} hint={filtersActive ? `Showing ${visibleShops}` : 'All shops'} />
+        <SummaryTile
+          icon={MapPinIcon}
+          label="Shops"
+          info="Number of shops in Metrics. Filters only change the list, not this count or the other totals."
+          value={String(shops)}
+          hint={filtersActive ? `Showing ${visibleShops}` : 'All shops'}
+        />
         <SummaryTile
           icon={StarIcon}
           iconClassName="fill-amber-400 text-amber-400"
           label="Weighted rating"
+          info="Share-weighted Google Maps rating: SUMPRODUCT(share, rating) / SUM(share). A shop with 40% share counts four times as much as a shop with 10%."
           value={weightedRating != null ? formatWeightedAverage(weightedRating) : '—'}
           hint="Google Maps, by share"
           highlight
@@ -533,6 +582,7 @@ function MetricsTotalsPanel({
         <SummaryTile
           icon={CalendarDaysIcon}
           label="Weighted days"
+          info="Share-weighted days since the last scraped review: SUMPRODUCT(share, days) / SUM(share). Lower means reviews are more recent overall."
           value={weightedDays != null ? formatWeightedAverage(weightedDays) : '—'}
           hint="Days since last review"
           highlight
@@ -540,6 +590,7 @@ function MetricsTotalsPanel({
         <SummaryTile
           icon={MessageSquareIcon}
           label="Reviews"
+          info="Total scraped reviews stored for all shops. This is the in-app count, not the public Google Maps total. Open a shop’s Reviews link in the table to see them."
           value={String(totalReviews)}
           hint="Scraped reviews"
           className="col-span-2 lg:col-span-1"
@@ -551,6 +602,7 @@ function MetricsTotalsPanel({
 
 function SummaryTile({
   label,
+  info,
   value,
   hint,
   icon: Icon,
@@ -560,6 +612,7 @@ function SummaryTile({
   className,
 }: {
   label: string
+  info: string
   value: string
   hint?: string
   icon: ComponentType<SVGProps<SVGSVGElement>>
@@ -578,7 +631,8 @@ function SummaryTile({
     >
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <Icon className={cn('size-3.5 shrink-0', iconClassName)} aria-hidden />
-        <p className="text-[11px] tracking-wide uppercase">{label}</p>
+        <p className="min-w-0 flex-1 text-[11px] tracking-wide uppercase">{label}</p>
+        <InfoTip label={label} side="left">{info}</InfoTip>
       </div>
       <p
         className={cn(
@@ -590,5 +644,53 @@ function SummaryTile({
       </p>
       {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
     </div>
+  )
+}
+
+function HeaderLabel({
+  label,
+  info,
+  align,
+}: {
+  label: string
+  info: string
+  align: 'left' | 'right'
+}) {
+  return (
+    <span className={cn('inline-flex items-center gap-1', align === 'right' && 'justify-end')}>
+      {label}
+      <InfoTip label={label}>{info}</InfoTip>
+    </span>
+  )
+}
+
+function InfoTip({
+  label,
+  children,
+  side = 'bottom',
+}: {
+  label: string
+  children: string
+  side?: 'top' | 'right' | 'bottom' | 'left'
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground normal-case hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+          aria-label={`About ${label}`}
+        >
+          <InfoIcon className="size-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        side={side}
+        align="start"
+        className="max-w-64 text-left leading-relaxed whitespace-normal"
+      >
+        {children}
+      </TooltipContent>
+    </Tooltip>
   )
 }
