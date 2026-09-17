@@ -351,29 +351,11 @@ export function MetricsGrid({
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 z-10 bg-muted/90 text-left text-xs tracking-wide text-muted-foreground uppercase backdrop-blur-sm">
                       <tr>
-                        <th className="px-4 py-3 font-semibold">
-                          <HeaderLabel align="left" label="Address" info="Shop name and Google Maps address. Stars are the shop’s current Google Maps rating." />
-                        </th>
-                        <th className="w-40 px-4 py-3 font-semibold">
-                          <HeaderLabel
-                            align="left"
-                            label="Last review"
-                            info="Date of the newest scraped review for this shop, and how many days ago that was."
-                          />
-                        </th>
-                        <th className="w-36 px-4 py-3 text-right font-semibold">
-                          <HeaderLabel
-                            align="right"
-                            label="Reviews"
-                            info="How many reviews are stored for this shop. Click the number to open all of that shop’s reviews."
-                          />
-                        </th>
+                        <th className="px-4 py-3 font-semibold">Address</th>
+                        <th className="w-40 px-4 py-3 font-semibold">Last review</th>
+                        <th className="w-36 px-4 py-3 text-right font-semibold">Reviews</th>
                         <th className="sticky top-0 right-0 z-20 w-44 bg-muted/90 px-4 py-3 text-right font-semibold shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]">
-                          <HeaderLabel
-                            align="right"
-                            label="Share"
-                            info="This shop’s portion of the chain, as a percent. Values must be 0 or greater and should add up to 100%. Each edit saves automatically."
-                          />
+                          Share
                         </th>
                       </tr>
                     </thead>
@@ -416,28 +398,24 @@ export function MetricsGrid({
                               </td>
                               <td className="px-4 py-3 align-top">
                                 {lastReviewAt ? (
-                                  <div className="flex items-start gap-1">
-                                    <Link
-                                      href={reviewsPageHref(campaign.id)}
-                                      className="min-w-0 flex-1 text-primary underline-offset-4 hover:underline"
-                                    >
-                                      <p className="tabular-nums">{formatLastReviewDate(lastReviewAt)}</p>
-                                      {daysAgo != null ? (
-                                        <p className="mt-0.5 text-xs text-muted-foreground">
-                                          {formatDaysSinceLastReview(daysAgo)}
-                                        </p>
-                                      ) : null}
-                                      {stats?.lastSnippet ? (
-                                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                                          {stats.lastSnippet}
-                                        </p>
-                                      ) : null}
-                                    </Link>
-                                    <InfoTip label="Last review">
-                                      Newest scraped review for this shop. Weighted days uses this date.
-                                      Open the link to read it on the Reviews page.
-                                    </InfoTip>
-                                  </div>
+                                  <Link
+                                    href={reviewsPageHref(campaign.id)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary underline-offset-4 hover:underline"
+                                  >
+                                    <p className="tabular-nums">{formatLastReviewDate(lastReviewAt)}</p>
+                                    {daysAgo != null ? (
+                                      <p className="mt-0.5 text-xs text-muted-foreground">
+                                        {formatDaysSinceLastReview(daysAgo)}
+                                      </p>
+                                    ) : null}
+                                    {stats?.lastSnippet ? (
+                                      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                                        {stats.lastSnippet}
+                                      </p>
+                                    ) : null}
+                                  </Link>
                                 ) : (
                                   <span className="text-muted-foreground">—</span>
                                 )}
@@ -446,6 +424,8 @@ export function MetricsGrid({
                                 {reviewsCount > 0 ? (
                                   <Link
                                     href={reviewsPageHref(campaign.id)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     className="font-medium text-primary tabular-nums underline-offset-4 hover:underline"
                                   >
                                     {reviewsCount} review{reviewsCount === 1 ? '' : 's'}
@@ -594,7 +574,6 @@ function MetricsTotalsPanel({
         <SummaryTile
           icon={PercentIcon}
           label="Share total"
-          info="Sum of every shop’s share. It should equal 100%. Remaining or over shows how far the current values are from that target."
           value={`${formatShare(total)}%`}
           hint={shareHint}
           tone={totalOk || saving ? 'default' : 'danger'}
@@ -602,7 +581,6 @@ function MetricsTotalsPanel({
         <SummaryTile
           icon={MapPinIcon}
           label="Shops"
-          info="Number of shops in Metrics. Filters only change the list, not this count or the other totals."
           value={String(shops)}
           hint={filtersActive ? `Showing ${visibleShops}` : 'All shops'}
         />
@@ -610,7 +588,6 @@ function MetricsTotalsPanel({
           icon={StarIcon}
           iconClassName="fill-amber-400 text-amber-400"
           label="Weighted rating"
-          info="Share-weighted Google Maps rating: SUMPRODUCT(share, rating) / SUM(share). A shop with 40% share counts four times as much as a shop with 10%."
           value={weightedRating != null ? formatWeightedAverage(weightedRating) : '—'}
           hint="Google Maps, by share"
           highlight
@@ -619,7 +596,6 @@ function MetricsTotalsPanel({
         <SummaryTile
           icon={MessageSquareIcon}
           label="Reviews"
-          info="Total scraped reviews stored for all shops. This is the in-app count, not the public Google Maps total. Open a shop’s Reviews link in the table to see them."
           value={String(totalReviews)}
           hint="Scraped reviews"
           className="col-span-2 lg:col-span-1"
@@ -700,28 +676,24 @@ function WeightedDaysTile({ lastReview }: { lastReview: LastReviewItem | null })
       <p className="text-[11px] text-muted-foreground">Days since last review</p>
 
       {lastReview ? (
-        <div className="mt-2 flex items-start gap-1 border-t border-amber-400/25 pt-2">
-          <Link
-            href={reviewsPageHref(lastReview.campaignId)}
-            className="min-w-0 flex-1 rounded-md hover:bg-background/40"
-          >
-            <p className="truncate text-sm font-medium">{lastReview.name}</p>
-            <p className="text-[11px] text-muted-foreground tabular-nums">
-              {formatLastReviewDate(lastReview.lastReviewAt)}
-              {lastReview.daysAgo != null ? ` · ${formatDaysSinceLastReview(lastReview.daysAgo)}` : ''}
-              {lastReview.rating != null ? ` · ${formatCampaignRating(lastReview.rating)}★` : ''}
-            </p>
-            {lastReview.snippet ? (
-              <p className="mt-0.5 line-clamp-3 text-[11px] text-muted-foreground">{lastReview.snippet}</p>
-            ) : (
-              <p className="mt-0.5 text-[11px] text-muted-foreground">No review text.</p>
-            )}
-          </Link>
-          <InfoTip label="Last review" side="left">
-            This is the newest scraped review. The number above is how many days have passed from
-            that review’s date until today.
-          </InfoTip>
-        </div>
+        <Link
+          href={reviewsPageHref(lastReview.campaignId)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 block min-w-0 border-t border-amber-400/25 pt-2 hover:bg-background/40"
+        >
+          <p className="truncate text-sm font-medium">{lastReview.name}</p>
+          <p className="text-[11px] text-muted-foreground tabular-nums">
+            {formatLastReviewDate(lastReview.lastReviewAt)}
+            {lastReview.daysAgo != null ? ` · ${formatDaysSinceLastReview(lastReview.daysAgo)}` : ''}
+            {lastReview.rating != null ? ` · ${formatCampaignRating(lastReview.rating)}★` : ''}
+          </p>
+          {lastReview.snippet ? (
+            <p className="mt-0.5 line-clamp-3 text-[11px] text-muted-foreground">{lastReview.snippet}</p>
+          ) : (
+            <p className="mt-0.5 text-[11px] text-muted-foreground">No review text.</p>
+          )}
+        </Link>
       ) : (
         <p className="mt-2 text-xs text-muted-foreground">No last review stored yet.</p>
       )}
@@ -731,7 +703,6 @@ function WeightedDaysTile({ lastReview }: { lastReview: LastReviewItem | null })
 
 function SummaryTile({
   label,
-  info,
   value,
   hint,
   icon: Icon,
@@ -741,7 +712,6 @@ function SummaryTile({
   className,
 }: {
   label: string
-  info: string
   value: string
   hint?: string
   icon: ComponentType<SVGProps<SVGSVGElement>>
@@ -760,8 +730,7 @@ function SummaryTile({
     >
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <Icon className={cn('size-3.5 shrink-0', iconClassName)} aria-hidden />
-        <p className="min-w-0 flex-1 text-[11px] tracking-wide uppercase">{label}</p>
-        <InfoTip label={label} side="left">{info}</InfoTip>
+        <p className="text-[11px] tracking-wide uppercase">{label}</p>
       </div>
       <p
         className={cn(
@@ -773,23 +742,6 @@ function SummaryTile({
       </p>
       {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
     </div>
-  )
-}
-
-function HeaderLabel({
-  label,
-  info,
-  align,
-}: {
-  label: string
-  info: string
-  align: 'left' | 'right'
-}) {
-  return (
-    <span className={cn('inline-flex items-center gap-1', align === 'right' && 'justify-end')}>
-      {label}
-      <InfoTip label={label}>{info}</InfoTip>
-    </span>
   )
 }
 
