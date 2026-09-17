@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, 
 import Link from 'next/link'
 import {
   CalendarDaysIcon,
-  ClipboardListIcon,
   DownloadIcon,
   InfoIcon,
   Loader2Icon,
@@ -602,12 +601,6 @@ function MetricsTotalsPanel({
         />
       </div>
       </div>
-      <MetricsCompletenessFooter
-        total={total}
-        totalOk={totalOk}
-        remaining={remaining}
-        invalidRow={invalidRow}
-      />
     </aside>
   )
 }
