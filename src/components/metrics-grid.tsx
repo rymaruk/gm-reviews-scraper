@@ -165,27 +165,6 @@ export function MetricsGrid({
     (sum, campaign) => sum + (initialReviewStats[campaign.id]?.count ?? 0),
     0,
   )
-  const completeness = useMemo(() => {
-    let shareFilled = 0
-    let lastReviewFilled = 0
-    let reviewsFilled = 0
-    let ratingFilled = 0
-    for (const campaign of campaigns) {
-      const share = parseShare(drafts[campaign.id] ?? '')
-      if (share != null && share > 0) shareFilled += 1
-      const stats = initialReviewStats[campaign.id]
-      if (stats?.lastReviewAt) lastReviewFilled += 1
-      if ((stats?.count ?? 0) > 0) reviewsFilled += 1
-      if (campaign.rating != null && Number.isFinite(campaign.rating)) ratingFilled += 1
-    }
-    return {
-      shops: campaigns.length,
-      shareFilled,
-      lastReviewFilled,
-      reviewsFilled,
-      ratingFilled,
-    }
-  }, [campaigns, drafts, initialReviewStats])
 
   const persistShares = useCallback(async (nextDrafts: Record<string, string>) => {
     const parsed = campaigns.map((campaign) => ({
@@ -523,7 +502,6 @@ export function MetricsGrid({
           totalReviews={totalReviews}
           weightedRating={weightedRating}
           lastReview={lastReview}
-          completeness={completeness}
         />
       ) : null}
       </div>
@@ -540,14 +518,6 @@ export function MetricsGrid({
 
 function draftsFromCampaigns(campaigns: Campaign[]): Record<string, string> {
   return Object.fromEntries(campaigns.map((campaign) => [campaign.id, formatShare(campaign.share)]))
-}
-
-type Completeness = {
-  shops: number
-  shareFilled: number
-  lastReviewFilled: number
-  reviewsFilled: number
-  ratingFilled: number
 }
 
 type LastReviewItem = {
@@ -572,7 +542,6 @@ function MetricsTotalsPanel({
   totalReviews,
   weightedRating,
   lastReview,
-  completeness,
 }: {
   saving: boolean
   dirty: boolean
@@ -586,7 +555,6 @@ function MetricsTotalsPanel({
   totalReviews: number
   weightedRating: number | null
   lastReview: LastReviewItem | null
-  completeness: Completeness
 }) {
   const shareHint = invalidRow
     ? 'Each share must be 0 or greater.'
@@ -663,7 +631,6 @@ function MetricsTotalsPanel({
         totalOk={totalOk}
         remaining={remaining}
         invalidRow={invalidRow}
-        completeness={completeness}
       />
     </aside>
   )
@@ -674,13 +641,11 @@ function MetricsCompletenessFooter({
   totalOk,
   remaining,
   invalidRow,
-  completeness,
 }: {
   total: number
   totalOk: boolean
   remaining: number
   invalidRow: boolean
-  completeness: Completeness
 }) {
   const shareStatus = invalidRow
     ? 'Each share must be 0 or greater.'
@@ -695,63 +660,25 @@ function MetricsCompletenessFooter({
       <div className="mb-2 flex items-center gap-1.5 text-muted-foreground">
         <ClipboardListIcon className="size-3.5 shrink-0" aria-hidden />
         <p className="min-w-0 flex-1 text-[11px] tracking-wide uppercase">Share & fields filled</p>
-        <InfoTip label="Share and fields filled" side="left">
-          Bottom recap of share total versus 100%, and how many shops have each Metrics field
-          filled: a share greater than 0, a last review, scraped reviews, and a Google Maps rating.
+        <InfoTip label="Share total" side="left">
+          Sum of every shop’s share. It should add up to 100%. Remaining or over is how far the
+          current values are from that target.
         </InfoTip>
       </div>
 
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="text-xs text-muted-foreground">Share total</p>
-        <p
-          className={cn(
-            'font-heading text-base font-medium tabular-nums',
-            !totalOk && 'text-destructive',
-          )}
-        >
-          {formatShare(total)}%
-        </p>
-      </div>
+      <p className="text-xs text-muted-foreground">Share total</p>
       <p
         className={cn(
-          'mb-2 text-[11px]',
-          totalOk ? 'text-muted-foreground' : 'text-destructive',
+          'font-heading text-lg font-medium tabular-nums',
+          !totalOk && 'text-destructive',
         )}
       >
+        {formatShare(total)}%
+      </p>
+      <p className={cn('text-[11px]', totalOk ? 'text-muted-foreground' : 'text-destructive')}>
         {shareStatus}
       </p>
-
-      <ul className="grid gap-1.5">
-        <FillRow label="Share filled" filled={completeness.shareFilled} total={completeness.shops} />
-        <FillRow
-          label="Last review"
-          filled={completeness.lastReviewFilled}
-          total={completeness.shops}
-        />
-        <FillRow label="Reviews" filled={completeness.reviewsFilled} total={completeness.shops} />
-        <FillRow label="Rating" filled={completeness.ratingFilled} total={completeness.shops} />
-      </ul>
     </div>
-  )
-}
-
-function FillRow({ label, filled, total }: { label: string; filled: number; total: number }) {
-  const percent = total === 0 ? 0 : Math.round((filled / total) * 100)
-  return (
-    <li>
-      <div className="flex items-baseline justify-between gap-2 text-xs">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="tabular-nums">
-          {filled}/{total} · {percent}%
-        </span>
-      </div>
-      <div className="mt-1 h-1 overflow-hidden rounded-full bg-foreground/10">
-        <div
-          className="h-full rounded-full bg-primary"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-    </li>
   )
 }
 
