@@ -1,5 +1,6 @@
 import { normalizeAddress } from '@/lib/place'
-import type { Campaign, StoredReview } from '@/lib/types'
+import { buildCampaignReviewStats } from '@/lib/reviews'
+import type { Campaign, CampaignReviewStats, StoredReview } from '@/lib/types'
 
 import { getSupabase } from './supabase'
 
@@ -96,6 +97,30 @@ export async function upsertReviews(reviews: StoredReview[]): Promise<void> {
 export async function deleteCampaign(id: string): Promise<void> {
   const { error } = await getSupabase().from('campaigns').delete().eq('id', id)
   if (error) throw new Error(error.message)
+}
+
+export async function listCampaignReviewStats(): Promise<Record<string, CampaignReviewStats>> {
+  const supabase = getSupabase()
+  const rows: Array<{ campaignId: string; isoDate?: string | null }> = []
+  let from = 0
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('campaign_id, iso_date')
+      .order('iso_date', { ascending: false, nullsFirst: false })
+      .range(from, from + PAGE_SIZE - 1)
+
+    if (error) throw new Error(error.message)
+    const page = (data ?? []) as Array<{ campaign_id: string; iso_date: string | null }>
+    for (const row of page) {
+      rows.push({ campaignId: row.campaign_id, isoDate: row.iso_date })
+    }
+    if (page.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+
+  return buildCampaignReviewStats(rows)
 }
 
 export async function updateCampaignShares(

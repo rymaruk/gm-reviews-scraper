@@ -1,5 +1,5 @@
 import { campaignDisplayName } from './place'
-import type { Campaign, RatingFilter, SortOption, StoredReview, TimeRange } from './types'
+import type { Campaign, CampaignReviewStats, RatingFilter, SortOption, StoredReview, TimeRange } from './types'
 
 export function mergeReviews(existing: StoredReview[], incoming: StoredReview[]): StoredReview[] {
   const byId = new Map(existing.map((review) => [reviewKey(review), review]))
@@ -120,6 +120,57 @@ export function reviewStarCount(rating: number): number {
 export function formatCampaignRating(rating: number): string {
   if (!Number.isFinite(rating)) return ''
   return Number.isInteger(rating) ? String(rating) : rating.toFixed(1)
+}
+
+export function buildCampaignReviewStats(
+  reviews: Array<{ campaignId: string; isoDate?: string | null }>,
+): Record<string, CampaignReviewStats> {
+  const stats: Record<string, { count: number; lastReviewAt: string | null; lastTime: number }> = {}
+
+  for (const review of reviews) {
+    const current = stats[review.campaignId] ?? {
+      count: 0,
+      lastReviewAt: null,
+      lastTime: Number.NEGATIVE_INFINITY,
+    }
+    current.count += 1
+    const time = review.isoDate ? Date.parse(review.isoDate) : Number.NaN
+    if (Number.isFinite(time) && time >= current.lastTime) {
+      current.lastTime = time
+      current.lastReviewAt = review.isoDate ?? null
+    }
+    stats[review.campaignId] = current
+  }
+
+  return Object.fromEntries(
+    Object.entries(stats).map(([id, value]) => [id, { count: value.count, lastReviewAt: value.lastReviewAt }]),
+  )
+}
+
+export function formatLastReviewDate(isoDate: string): string {
+  const day = isoDate.slice(0, 10)
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T00:00:00`) : new Date(isoDate)
+  if (Number.isNaN(date.getTime())) return isoDate
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+export function daysSinceLastReview(isoDate: string, now = new Date()): number | null {
+  const day = isoDate.slice(0, 10)
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T00:00:00`) : new Date(isoDate)
+  if (Number.isNaN(date.getTime())) return null
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((end.getTime() - start.getTime()) / 86_400_000)
+}
+
+export function formatDaysSinceLastReview(days: number): string {
+  if (days <= 0) return 'Today'
+  if (days === 1) return '1 day ago'
+  return `${days} days ago`
 }
 
 export function reviewsToCsv(

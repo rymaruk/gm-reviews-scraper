@@ -6,6 +6,7 @@ import {
   defaultFilterParams,
   listActiveFilters,
   resetActiveFilters,
+  reviewsPageHref,
 } from './search-params'
 
 const filters = {
@@ -51,5 +52,11 @@ describe('clearActiveFilter', () => {
 describe('resetActiveFilters', () => {
   it('returns the default filter set', () => {
     assert.deepEqual(resetActiveFilters(), defaultFilterParams)
+  })
+})
+
+describe('reviewsPageHref', () => {
+  it('links to the reviews page filtered to one shop', () => {
+    assert.equal(reviewsPageHref('shop-1'), '/?company=shop-1')
   })
 })

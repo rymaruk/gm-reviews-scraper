@@ -71,6 +71,17 @@ describe('shareWeightedAverage', () => {
     assert.equal(average, 5)
   })
 
+  it('weights days since last review the same way', () => {
+    const average = shareWeightedAverage([
+      { share: 9, value: 6 },
+      { share: 10, value: 2 },
+      { share: 41, value: 55 },
+      { share: 26, value: 1 },
+      { share: 14, value: 4 },
+    ])
+    assert.equal(average, 24.11)
+  })
+
   it('formats Google Maps ratings to one decimal and mixed scores to two', () => {
     assert.equal(formatWeightedAverage(4.8), '4.8')
     assert.equal(formatWeightedAverage(2.74), '2.74')

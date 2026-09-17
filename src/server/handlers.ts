@@ -8,6 +8,7 @@ import {
   deleteCampaign,
   findExistingCampaign,
   getCampaign,
+  listCampaignReviewStats,
   listCampaigns,
   listReviews,
   updateCampaignShares,
@@ -30,8 +31,8 @@ export async function handleStore(): Promise<ApiResult> {
 
 export async function handleCampaigns(): Promise<ApiResult> {
   try {
-    const campaigns = await listCampaigns()
-    return { status: 200, body: { campaigns } }
+    const [campaigns, reviewStats] = await Promise.all([listCampaigns(), listCampaignReviewStats()])
+    return { status: 200, body: { campaigns, reviewStats } }
   } catch (error) {
     return { status: 502, body: { error: toErrorMessage(error) } }
   }

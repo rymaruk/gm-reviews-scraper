@@ -152,6 +152,12 @@ export function resetActiveFilters(): FilterParams {
   return { ...defaultFilterParams }
 }
 
+export function reviewsPageHref(companyId: string): string {
+  const params = new URLSearchParams()
+  params.set('company', companyId)
+  return `/?${params.toString()}`
+}
+
 function isRating(value: string | null): value is RatingFilter {
   return value != null && RATINGS.has(value as RatingFilter)
 }

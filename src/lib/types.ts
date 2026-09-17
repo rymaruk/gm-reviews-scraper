@@ -54,6 +54,11 @@ export type StoredReview = Review & {
   campaignId: string
 }
 
+export type CampaignReviewStats = {
+  count: number
+  lastReviewAt: string | null
+}
+
 export type ReviewsPage = {
   place: PlaceInfo
   reviews: Review[]

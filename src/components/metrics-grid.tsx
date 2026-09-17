@@ -1,7 +1,18 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DownloadIcon, Loader2Icon, SearchIcon, UploadIcon } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type SVGProps } from 'react'
+import Link from 'next/link'
+import {
+  CalendarDaysIcon,
+  DownloadIcon,
+  Loader2Icon,
+  MapPinIcon,
+  MessageSquareIcon,
+  PercentIcon,
+  SearchIcon,
+  StarIcon,
+  UploadIcon,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ActiveFiltersPanel } from '@/components/active-filters-panel'
@@ -26,12 +37,18 @@ import {
   campaignMatchesCity,
   groupCampaignsByCity,
 } from '@/lib/place'
-import { formatCampaignRating } from '@/lib/reviews'
+import {
+  daysSinceLastReview,
+  formatCampaignRating,
+  formatDaysSinceLastReview,
+  formatLastReviewDate,
+} from '@/lib/reviews'
 import {
   clearActiveFilter,
   defaultFilterParams,
   listActiveFilters,
   resetActiveFilters,
+  reviewsPageHref,
   type ActiveFilterId,
   type FilterParams,
 } from '@/lib/search-params'
@@ -46,16 +63,18 @@ import {
   shareWeightedAverage,
   sharesTotal,
 } from '@/lib/shares'
-import type { Campaign } from '@/lib/types'
+import type { Campaign, CampaignReviewStats } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 const AUTOSAVE_MS = 1000
 
 export function MetricsGrid({
   initialCampaigns,
+  initialReviewStats,
   initialError,
 }: {
   initialCampaigns: Campaign[]
+  initialReviewStats: Record<string, CampaignReviewStats>
   initialError: string | null
 }) {
   const [campaigns, setCampaigns] = useState(initialCampaigns)
@@ -117,6 +136,20 @@ export function MetricsGrid({
       }
       return [{ share, value: campaign.rating }]
     }),
+  )
+  const weightedDays = shareWeightedAverage(
+    campaigns.flatMap((campaign) => {
+      const share = parseShare(drafts[campaign.id] ?? '')
+      const lastReviewAt = initialReviewStats[campaign.id]?.lastReviewAt
+      if (share == null || share <= 0 || !lastReviewAt) return []
+      const days = daysSinceLastReview(lastReviewAt)
+      if (days == null) return []
+      return [{ share, value: days }]
+    }),
+  )
+  const totalReviews = campaigns.reduce(
+    (sum, campaign) => sum + (initialReviewStats[campaign.id]?.count ?? 0),
+    0,
   )
 
   const persistShares = useCallback(async (nextDrafts: Record<string, string>) => {
@@ -215,15 +248,15 @@ export function MetricsGrid({
     <div className="flex h-svh flex-col overflow-hidden bg-background">
       <AppHeader current="metrics" />
 
-      <main className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
           <div>
             <MetricsBreadcrumb />
             <h1 className="font-heading text-3xl font-medium">Metrics</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Assign a share to each shop. Values can be 0 or greater, and the total should be {SHARE_TOTAL}%.
-              The weighted Google Maps rating is SUMPRODUCT(share, rating) / SUM(share). Each shop saves
-              automatically after you stop typing.
+              Each shop saves automatically after you stop typing.
             </p>
           </div>
 
@@ -285,19 +318,23 @@ export function MetricsGrid({
                   No shops match that name, address, or city.
                 </div>
               ) : (
-                <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
+                <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 z-10 bg-muted/90 text-left text-xs tracking-wide text-muted-foreground uppercase backdrop-blur-sm">
                       <tr>
                         <th className="px-4 py-3 font-semibold">Address</th>
-                        <th className="w-44 px-4 py-3 text-right font-semibold">Share</th>
+                        <th className="w-40 px-4 py-3 font-semibold">Last review</th>
+                        <th className="w-32 px-4 py-3 text-right font-semibold">Reviews</th>
+                        <th className="sticky top-0 right-0 z-20 w-44 bg-muted/90 px-4 py-3 text-right font-semibold shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]">
+                          Share
+                        </th>
                       </tr>
                     </thead>
                     {grouped.map((group) => (
                       <tbody key={group.city}>
                         <tr>
                           <th
-                            colSpan={2}
+                            colSpan={4}
                             scope="colgroup"
                             className="border-t bg-muted/50 px-4 py-2 text-left text-xs font-semibold tracking-wide text-muted-foreground"
                           >
@@ -309,7 +346,10 @@ export function MetricsGrid({
                           const parsed = parseShare(raw)
                           const rowInvalid = parsed == null || parsed < 0
                           const name = campaignDisplayName(campaign)
-                          const reviewsCount = campaign.reviewsCount ?? 0
+                          const stats = initialReviewStats[campaign.id]
+                          const reviewsCount = stats?.count ?? 0
+                          const lastReviewAt = stats?.lastReviewAt
+                          const daysAgo = lastReviewAt ? daysSinceLastReview(lastReviewAt) : null
                           const rowSaving = saving && lastEditedId === campaign.id
                           return (
                             <tr key={campaign.id} className="border-t">
@@ -318,22 +358,42 @@ export function MetricsGrid({
                                 <p className="mt-0.5 text-xs break-all text-muted-foreground">
                                   {campaign.address ?? campaign.type ?? 'Google Maps place'}
                                 </p>
-                                <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                  {campaign.rating != null ? (
-                                    <>
-                                      <Stars rating={campaign.rating} />
-                                      <span className="tabular-nums text-amber-400">
-                                        {formatCampaignRating(campaign.rating)}
-                                      </span>
-                                      <span className="h-3 w-px shrink-0 bg-border" aria-hidden="true" />
-                                    </>
-                                  ) : null}
-                                  <span>
-                                    {reviewsCount} review{reviewsCount === 1 ? '' : 's'}
-                                  </span>
-                                </p>
+                                {campaign.rating != null ? (
+                                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                    <Stars rating={campaign.rating} />
+                                    <span className="tabular-nums text-amber-400">
+                                      {formatCampaignRating(campaign.rating)}
+                                    </span>
+                                  </p>
+                                ) : null}
                               </td>
                               <td className="px-4 py-3 align-top">
+                                {lastReviewAt ? (
+                                  <div>
+                                    <p className="tabular-nums">{formatLastReviewDate(lastReviewAt)}</p>
+                                    {daysAgo != null ? (
+                                      <p className="mt-0.5 text-xs text-muted-foreground">
+                                        {formatDaysSinceLastReview(daysAgo)}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 align-top text-right">
+                                {reviewsCount > 0 ? (
+                                  <Link
+                                    href={reviewsPageHref(campaign.id)}
+                                    className="font-medium text-primary tabular-nums underline-offset-4 hover:underline"
+                                  >
+                                    {reviewsCount} review{reviewsCount === 1 ? '' : 's'}
+                                  </Link>
+                                ) : (
+                                  <span className="text-muted-foreground tabular-nums">0 reviews</span>
+                                )}
+                              </td>
+                              <td className="sticky right-0 bg-background px-4 py-3 align-top shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.25)]">
                                 <div className="flex items-center justify-end gap-1.5">
                                   {rowSaving ? (
                                     <Loader2Icon
@@ -368,36 +428,22 @@ export function MetricsGrid({
       </main>
 
       {campaigns.length > 0 && !initialError ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-3 border-t bg-sidebar px-4 py-3">
-          {saving ? (
-            <Loader2Icon className="size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden />
-          ) : null}
-          <p
-            className={cn(
-              'text-sm tabular-nums',
-              totalOk || saving ? 'text-muted-foreground' : 'text-destructive',
-            )}
-            aria-live="polite"
-          >
-            {saving
-              ? 'Saving shares…'
-              : invalidRow
-                ? 'Each share must be 0 or greater.'
-                : `${
-                    totalOk
-                      ? `Total: ${SHARE_TOTAL}%`
-                      : remaining > 0
-                        ? `Total: ${formatShare(total)}% (${formatShare(remaining)}% remaining)`
-                        : `Total: ${formatShare(total)}% (${formatShare(Math.abs(remaining))}% over)`
-                  }${
-                    weightedRating != null
-                      ? ` · Weighted Google Maps rating: ${formatWeightedAverage(weightedRating)}`
-                      : ''
-                  }${dirty ? ' · Saving shortly' : ''}`}
-            {filtersActive ? ` · Showing ${visible.length} of ${campaigns.length}` : null}
-          </p>
-        </div>
+        <MetricsTotalsPanel
+          saving={saving}
+          dirty={dirty}
+          invalidRow={invalidRow}
+          total={total}
+          totalOk={totalOk}
+          remaining={remaining}
+          shops={campaigns.length}
+          visibleShops={visible.length}
+          filtersActive={filtersActive}
+          totalReviews={totalReviews}
+          weightedRating={weightedRating}
+          weightedDays={weightedDays}
+        />
       ) : null}
+      </div>
       <ShareCsvImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
@@ -411,4 +457,138 @@ export function MetricsGrid({
 
 function draftsFromCampaigns(campaigns: Campaign[]): Record<string, string> {
   return Object.fromEntries(campaigns.map((campaign) => [campaign.id, formatShare(campaign.share)]))
+}
+
+function MetricsTotalsPanel({
+  saving,
+  dirty,
+  invalidRow,
+  total,
+  totalOk,
+  remaining,
+  shops,
+  visibleShops,
+  filtersActive,
+  totalReviews,
+  weightedRating,
+  weightedDays,
+}: {
+  saving: boolean
+  dirty: boolean
+  invalidRow: boolean
+  total: number
+  totalOk: boolean
+  remaining: number
+  shops: number
+  visibleShops: number
+  filtersActive: boolean
+  totalReviews: number
+  weightedRating: number | null
+  weightedDays: number | null
+}) {
+  const shareHint = invalidRow
+    ? 'Each share must be 0 or greater.'
+    : totalOk
+      ? `Target ${SHARE_TOTAL}%`
+      : remaining > 0
+        ? `${formatShare(remaining)}% remaining`
+        : `${formatShare(Math.abs(remaining))}% over`
+
+  return (
+    <aside
+      className="max-h-[42svh] shrink-0 overflow-y-auto border-t bg-sidebar lg:max-h-none lg:h-full lg:w-80 lg:border-t-0 lg:border-l"
+      aria-label="Share totals and weighted calculations"
+    >
+      <div className="flex items-start justify-between gap-2 border-b px-4 py-3">
+        <div>
+          <h2 className="font-heading text-sm font-medium">Totals</h2>
+          <p className="text-[11px] text-muted-foreground">
+            SUMPRODUCT(share, value) / Σ share
+          </p>
+        </div>
+        {saving ? (
+          <Loader2Icon className="mt-0.5 size-4 shrink-0 animate-spin text-muted-foreground" aria-label="Saving shares" />
+        ) : dirty ? (
+          <p className="text-[11px] text-muted-foreground">Saving shortly</p>
+        ) : null}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 p-3 lg:grid-cols-1" aria-live="polite">
+        <SummaryTile
+          icon={PercentIcon}
+          label="Share total"
+          value={`${formatShare(total)}%`}
+          hint={shareHint}
+          tone={totalOk || saving ? 'default' : 'danger'}
+        />
+        <SummaryTile icon={MapPinIcon} label="Shops" value={String(shops)} hint={filtersActive ? `Showing ${visibleShops}` : 'All shops'} />
+        <SummaryTile
+          icon={StarIcon}
+          iconClassName="fill-amber-400 text-amber-400"
+          label="Weighted rating"
+          value={weightedRating != null ? formatWeightedAverage(weightedRating) : '—'}
+          hint="Google Maps, by share"
+          highlight
+        />
+        <SummaryTile
+          icon={CalendarDaysIcon}
+          label="Weighted days"
+          value={weightedDays != null ? formatWeightedAverage(weightedDays) : '—'}
+          hint="Days since last review"
+          highlight
+        />
+        <SummaryTile
+          icon={MessageSquareIcon}
+          label="Reviews"
+          value={String(totalReviews)}
+          hint="Scraped reviews"
+          className="col-span-2 lg:col-span-1"
+        />
+      </div>
+    </aside>
+  )
+}
+
+function SummaryTile({
+  label,
+  value,
+  hint,
+  icon: Icon,
+  iconClassName,
+  highlight = false,
+  tone = 'default',
+  className,
+}: {
+  label: string
+  value: string
+  hint?: string
+  icon: ComponentType<SVGProps<SVGSVGElement>>
+  iconClassName?: string
+  highlight?: boolean
+  tone?: 'default' | 'danger'
+  className?: string
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-xl px-3 py-2 ring-1',
+        highlight ? 'bg-amber-400/15 ring-amber-400/35' : 'bg-background/70 ring-foreground/5',
+        className,
+      )}
+    >
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        <Icon className={cn('size-3.5 shrink-0', iconClassName)} aria-hidden />
+        <p className="text-[11px] tracking-wide uppercase">{label}</p>
+      </div>
+      <p
+        className={cn(
+          'mt-0.5 font-heading text-lg font-medium tabular-nums',
+          tone === 'danger' && 'text-destructive',
+        )}
+      >
+        {value}
+      </p>
+      {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
+    </div>
+  )
 }
