@@ -128,7 +128,6 @@ export function MetricsGrid({
   const dirty = campaigns.some(
     (campaign) => parseShare(drafts[campaign.id] ?? '') !== roundShare(campaign.share),
   )
-  const filtersActive = Boolean(filter.trim()) || city !== 'all'
   const weightedRating = shareWeightedAverage(
     campaigns.flatMap((campaign) => {
       const share = parseShare(drafts[campaign.id] ?? '')
@@ -474,9 +473,6 @@ export function MetricsGrid({
           total={total}
           totalOk={totalOk}
           remaining={remaining}
-          shops={campaigns.length}
-          visibleShops={visible.length}
-          filtersActive={filtersActive}
           totalReviews={totalReviews}
           weightedRating={weightedRating}
           lastReview={lastReview}
@@ -514,9 +510,6 @@ function MetricsTotalsPanel({
   total,
   totalOk,
   remaining,
-  shops,
-  visibleShops,
-  filtersActive,
   totalReviews,
   weightedRating,
   lastReview,
@@ -527,9 +520,6 @@ function MetricsTotalsPanel({
   total: number
   totalOk: boolean
   remaining: number
-  shops: number
-  visibleShops: number
-  filtersActive: boolean
   totalReviews: number
   weightedRating: number | null
   lastReview: LastReviewItem | null
@@ -575,12 +565,6 @@ function MetricsTotalsPanel({
           value={`${formatShare(total)}%`}
           hint={shareHint}
           tone={totalOk || saving ? 'default' : 'danger'}
-        />
-        <SummaryTile
-          icon={MapPinIcon}
-          label="Shops"
-          value={String(shops)}
-          hint={filtersActive ? `Showing ${visibleShops}` : 'All shops'}
         />
         <SummaryTile
           icon={StarIcon}
