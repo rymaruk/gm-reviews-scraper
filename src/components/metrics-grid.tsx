@@ -7,7 +7,6 @@ import {
   DownloadIcon,
   InfoIcon,
   Loader2Icon,
-  MapPinIcon,
   MessageSquareIcon,
   PercentIcon,
   SearchIcon,
@@ -269,9 +268,9 @@ export function MetricsGrid({
             <h1 className="flex items-center gap-2 font-heading text-3xl font-medium">
               Metrics
               <InfoTip label="Metrics">
-                Assign each shop a share of the chain. Totals on the right use those shares to
-                weight Google Maps ratings and days since the last review, the same way Excel
-                SUMPRODUCT does.
+                Assign each shop a share of the chain. Weighted rating uses those shares
+                (SUMPRODUCT of share and Google Maps rating). Days since last review is today minus
+                the newest last-review date.
               </InfoTip>
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -316,8 +315,8 @@ export function MetricsGrid({
                     </SelectContent>
                   </Select>
                   <InfoTip label="Filters">
-                    Search and city only hide rows in the list. Share total, weighted rating, weighted
-                    days, and review count still include every shop.
+                    Search and city only hide rows in the list. Share total, weighted rating, days
+                    since last review, and review count still include every shop.
                   </InfoTip>
                   <div className="flex shrink-0 items-center gap-2">
                     <Button type="button" variant="outline" onClick={exportCsv}>
@@ -553,8 +552,8 @@ function MetricsTotalsPanel({
           <h2 className="flex items-center gap-1.5 font-heading text-sm font-medium">
             Totals
             <InfoTip label="Totals" side="left">
-              Live results for every shop. Yellow tiles are share-weighted averages:
-              SUMPRODUCT(share, value) divided by the sum of shares. Shops with 0% share are skipped.
+              Live results for every shop. Weighted rating is SUMPRODUCT(share, rating) / SUM(share).
+              Days since last review is whole days from the newest last review to today.
             </InfoTip>
           </h2>
           <p className="text-[11px] text-muted-foreground">
@@ -616,16 +615,16 @@ function WeightedDaysTile({ lastReview }: { lastReview: LastReviewItem | null })
     <div className="col-span-2 rounded-xl bg-amber-400/15 px-3 py-2 ring-1 ring-amber-400/35 lg:col-span-1">
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <CalendarDaysIcon className="size-3.5 shrink-0" aria-hidden />
-        <p className="min-w-0 flex-1 text-[11px] tracking-wide uppercase">Weighted days</p>
-        <InfoTip label="Weighted days" side="left">
-          Whole days between today and the newest last review among all shops. Today is the current
-          calendar date. That last review is shown below.
+        <p className="min-w-0 flex-1 text-[11px] tracking-wide uppercase">Days since last review</p>
+        <InfoTip label="Days since last review" side="left">
+          Whole calendar days: today minus the date of the newest last review among all shops.
+          Today is shown on the right. That last review is shown below.
         </InfoTip>
       </div>
       <div className="mt-0.5 flex items-start justify-between gap-3">
         <div>
           <p className="font-heading text-lg font-medium tabular-nums">{daysLabel}</p>
-          <p className="text-[11px] text-muted-foreground">Days since last review</p>
+          <p className="text-[11px] text-muted-foreground">Today − last review</p>
         </div>
         <div className="text-right">
           <p className="text-[11px] tracking-wide text-muted-foreground uppercase">Today</p>
