@@ -605,52 +605,6 @@ function MetricsTotalsPanel({
   )
 }
 
-function MetricsCompletenessFooter({
-  total,
-  totalOk,
-  remaining,
-  invalidRow,
-}: {
-  total: number
-  totalOk: boolean
-  remaining: number
-  invalidRow: boolean
-}) {
-  const shareStatus = invalidRow
-    ? 'Each share must be 0 or greater.'
-    : totalOk
-      ? `On target · ${SHARE_TOTAL}%`
-      : remaining > 0
-        ? `${formatShare(remaining)}% remaining`
-        : `${formatShare(Math.abs(remaining))}% over`
-
-  return (
-    <div className="shrink-0 border-t bg-sidebar px-3 py-3">
-      <div className="mb-2 flex items-center gap-1.5 text-muted-foreground">
-        <ClipboardListIcon className="size-3.5 shrink-0" aria-hidden />
-        <p className="min-w-0 flex-1 text-[11px] tracking-wide uppercase">Share & fields filled</p>
-        <InfoTip label="Share total" side="left">
-          Sum of every shop’s share. It should add up to 100%. Remaining or over is how far the
-          current values are from that target.
-        </InfoTip>
-      </div>
-
-      <p className="text-xs text-muted-foreground">Share total</p>
-      <p
-        className={cn(
-          'font-heading text-lg font-medium tabular-nums',
-          !totalOk && 'text-destructive',
-        )}
-      >
-        {formatShare(total)}%
-      </p>
-      <p className={cn('text-[11px]', totalOk ? 'text-muted-foreground' : 'text-destructive')}>
-        {shareStatus}
-      </p>
-    </div>
-  )
-}
-
 function WeightedDaysTile({ lastReview }: { lastReview: LastReviewItem | null }) {
   const days = lastReview?.daysAgo
   const daysLabel = days == null ? '—' : String(Math.max(0, days))
