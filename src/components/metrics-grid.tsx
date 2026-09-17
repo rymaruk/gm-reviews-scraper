@@ -139,20 +139,6 @@ export function MetricsGrid({
       return [{ share, value: campaign.rating }]
     }),
   )
-  const weightedDays = shareWeightedAverage(
-    campaigns.flatMap((campaign) => {
-      const share = parseShare(drafts[campaign.id] ?? '')
-      const lastReviewAt = initialReviewStats[campaign.id]?.lastReviewAt
-      if (share == null || share <= 0 || !lastReviewAt) return []
-      const days = daysSinceLastReview(lastReviewAt)
-      if (days == null) return []
-      return [{ share, value: days }]
-    }),
-  )
-  const totalReviews = campaigns.reduce(
-    (sum, campaign) => sum + (initialReviewStats[campaign.id]?.count ?? 0),
-    0,
-  )
   const lastReviews = useMemo(
     () =>
       campaigns
@@ -172,6 +158,11 @@ export function MetricsGrid({
         })
         .sort((left, right) => right.lastReviewAt.localeCompare(left.lastReviewAt)),
     [campaigns, initialReviewStats],
+  )
+  const lastReview = lastReviews[0] ?? null
+  const totalReviews = campaigns.reduce(
+    (sum, campaign) => sum + (initialReviewStats[campaign.id]?.count ?? 0),
+    0,
   )
 
   const persistShares = useCallback(async (nextDrafts: Record<string, string>) => {
@@ -509,8 +500,7 @@ export function MetricsGrid({
           filtersActive={filtersActive}
           totalReviews={totalReviews}
           weightedRating={weightedRating}
-          weightedDays={weightedDays}
-          lastReviews={lastReviews}
+          lastReview={lastReview}
         />
       ) : null}
       </div>
@@ -550,8 +540,7 @@ function MetricsTotalsPanel({
   filtersActive,
   totalReviews,
   weightedRating,
-  weightedDays,
-  lastReviews,
+  lastReview,
 }: {
   saving: boolean
   dirty: boolean
@@ -564,8 +553,7 @@ function MetricsTotalsPanel({
   filtersActive: boolean
   totalReviews: number
   weightedRating: number | null
-  weightedDays: number | null
-  lastReviews: LastReviewItem[]
+  lastReview: LastReviewItem | null
 }) {
   const shareHint = invalidRow
     ? 'Each share must be 0 or greater.'
@@ -625,7 +613,7 @@ function MetricsTotalsPanel({
           hint="Google Maps, by share"
           highlight
         />
-        <WeightedDaysTile weightedDays={weightedDays} lastReviews={lastReviews} />
+        <WeightedDaysTile lastReview={lastReview} />
         <SummaryTile
           icon={MessageSquareIcon}
           label="Reviews"
@@ -639,58 +627,48 @@ function MetricsTotalsPanel({
   )
 }
 
-function WeightedDaysTile({
-  weightedDays,
-  lastReviews,
-}: {
-  weightedDays: number | null
-  lastReviews: LastReviewItem[]
-}) {
+function WeightedDaysTile({ lastReview }: { lastReview: LastReviewItem | null }) {
+  const days = lastReview?.daysAgo
+  const daysLabel = days == null ? '—' : String(Math.max(0, days))
+
   return (
     <div className="col-span-2 rounded-xl bg-amber-400/15 px-3 py-2 ring-1 ring-amber-400/35 lg:col-span-1">
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <CalendarDaysIcon className="size-3.5 shrink-0" aria-hidden />
         <p className="min-w-0 flex-1 text-[11px] tracking-wide uppercase">Weighted days</p>
         <InfoTip label="Weighted days" side="left">
-          Share-weighted days since each shop’s last scraped review: SUMPRODUCT(share, days) /
-          SUM(share). The list below is that last review for every shop — date, text, and a link to
-          open it.
+          Whole days between today and the newest last review among all shops. That review is shown
+          below. Open the link to read it on the Reviews page.
         </InfoTip>
       </div>
-      <p className="mt-0.5 font-heading text-lg font-medium tabular-nums">
-        {weightedDays != null ? formatWeightedAverage(weightedDays) : '—'}
-      </p>
+      <p className="mt-0.5 font-heading text-lg font-medium tabular-nums">{daysLabel}</p>
       <p className="text-[11px] text-muted-foreground">Days since last review</p>
 
-      {lastReviews.length === 0 ? (
-        <p className="mt-2 text-xs text-muted-foreground">No last reviews stored yet.</p>
+      {lastReview ? (
+        <div className="mt-2 flex items-start gap-1 border-t border-amber-400/25 pt-2">
+          <Link
+            href={reviewsPageHref(lastReview.campaignId)}
+            className="min-w-0 flex-1 rounded-md hover:bg-background/40"
+          >
+            <p className="truncate text-sm font-medium">{lastReview.name}</p>
+            <p className="text-[11px] text-muted-foreground tabular-nums">
+              {formatLastReviewDate(lastReview.lastReviewAt)}
+              {lastReview.daysAgo != null ? ` · ${formatDaysSinceLastReview(lastReview.daysAgo)}` : ''}
+              {lastReview.rating != null ? ` · ${formatCampaignRating(lastReview.rating)}★` : ''}
+            </p>
+            {lastReview.snippet ? (
+              <p className="mt-0.5 line-clamp-3 text-[11px] text-muted-foreground">{lastReview.snippet}</p>
+            ) : (
+              <p className="mt-0.5 text-[11px] text-muted-foreground">No review text.</p>
+            )}
+          </Link>
+          <InfoTip label="Last review" side="left">
+            This is the newest scraped review. The number above is how many days have passed from
+            that review’s date until today.
+          </InfoTip>
+        </div>
       ) : (
-        <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto border-t border-amber-400/25 pt-2">
-          {lastReviews.map((review) => (
-            <li key={review.campaignId} className="flex items-start gap-1">
-              <Link
-                href={reviewsPageHref(review.campaignId)}
-                className="min-w-0 flex-1 rounded-md hover:bg-background/40"
-              >
-                <p className="truncate text-sm font-medium">{review.name}</p>
-                <p className="text-[11px] text-muted-foreground tabular-nums">
-                  {formatLastReviewDate(review.lastReviewAt)}
-                  {review.daysAgo != null ? ` · ${formatDaysSinceLastReview(review.daysAgo)}` : ''}
-                  {review.rating != null ? ` · ${formatCampaignRating(review.rating)}★` : ''}
-                </p>
-                {review.snippet ? (
-                  <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{review.snippet}</p>
-                ) : (
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">No review text.</p>
-                )}
-              </Link>
-              <InfoTip label={`Last review for ${review.name}`} side="left">
-                Newest scraped review left for this shop. Weighted days uses this date. Open the
-                link to read all of this shop’s reviews.
-              </InfoTip>
-            </li>
-          ))}
-        </ul>
+        <p className="mt-2 text-xs text-muted-foreground">No last review stored yet.</p>
       )}
     </div>
   )
