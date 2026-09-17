@@ -16,24 +16,24 @@ import {
 } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { updateCampaignWeights } from '@/lib/api'
+import { updateCampaignShares } from '@/lib/api'
 import type { Campaign } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import {
-  createWeightImportState,
+  createShareImportState,
   emptyImportPlan,
   importCounts,
-  parseWeightCsvRows,
+  parseShareCsvRows,
   statusLabel,
-  type WeightImportPlan,
-  type WeightImportRow,
-  type WeightImportStatus,
-} from '@/lib/weight-csv'
+  type ShareImportPlan,
+  type ShareImportRow,
+  type ShareImportStatus,
+} from '@/lib/share-csv'
 
 const ROW_CHUNK = 6
-const FILE_INPUT_ID = 'metrics-weight-csv-file'
+const FILE_INPUT_ID = 'metrics-share-csv-file'
 
-export function WeightCsvImportDialog({
+export function ShareCsvImportDialog({
   open,
   onOpenChange,
   campaigns,
@@ -44,7 +44,7 @@ export function WeightCsvImportDialog({
   onOpenChange: (open: boolean) => void
   campaigns: Campaign[]
   drafts: Record<string, string>
-  onImported: (weights: Array<{ id: string; weight: number }>) => void
+  onImported: (shares: Array<{ id: string; share: number }>) => void
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const openRef = useRef(open)
@@ -53,8 +53,8 @@ export function WeightCsvImportDialog({
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [message, setMessage] = useState('')
-  const [plan, setPlan] = useState<WeightImportPlan | null>(null)
-  const [previewRows, setPreviewRows] = useState<WeightImportRow[]>([])
+  const [plan, setPlan] = useState<ShareImportPlan | null>(null)
+  const [previewRows, setPreviewRows] = useState<ShareImportRow[]>([])
 
   openRef.current = open
 
@@ -101,14 +101,14 @@ export function WeightCsvImportDialog({
       if (!openRef.current) return
       await yieldUi()
       if (!openRef.current) return
-      const parsed = parseWeightCsvRows(text)
+      const parsed = parseShareCsvRows(text)
       if (parsed.parseError) {
         setPlan(emptyImportPlan(parsed.parseError))
         return
       }
 
-      const importer = createWeightImportState(campaigns, drafts)
-      const nextRows: WeightImportRow[] = []
+      const importer = createShareImportState(campaigns, drafts)
+      const nextRows: ShareImportRow[] = []
       setMessage(
         parsed.records.length === 0 ? 'No data rows in the CSV.' : 'Validating shops…',
       )
@@ -130,13 +130,13 @@ export function WeightCsvImportDialog({
       const nextPlan = importer.finish(nextRows)
       if (nextPlan.canSave) {
         setProgress(90)
-        setMessage(`Saving ${nextPlan.changedCount} weight${nextPlan.changedCount === 1 ? '' : 's'}…`)
+        setMessage(`Saving ${nextPlan.changedCount} share${nextPlan.changedCount === 1 ? '' : 's'}…`)
         await yieldUi()
         if (!openRef.current) return
-        await updateCampaignWeights(nextPlan.weights)
+        await updateCampaignShares(nextPlan.shares)
         if (!openRef.current) return
-        onImported(nextPlan.weights)
-        toast.success('Weights updated')
+        onImported(nextPlan.shares)
+        toast.success('Shares updated')
       }
       setProgress(100)
       setPlan(nextPlan)
@@ -178,7 +178,7 @@ export function WeightCsvImportDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>Import weights</DialogTitle>
+          <DialogTitle>Import shares</DialogTitle>
           <DialogDescription>
             {running
               ? message
@@ -186,7 +186,7 @@ export function WeightCsvImportDialog({
                 ? error
                 : plan
                   ? `Updated ${counts.updated} address${counts.updated === 1 ? '' : 'es'}. ${counts.notUpdated} not updated.`
-                  : 'Choose a CSV with Address and Weight columns, then import.'}
+                  : 'Choose a CSV with Address and Share columns, then import.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -202,7 +202,7 @@ export function WeightCsvImportDialog({
                 id={FILE_INPUT_ID}
                 ref={fileRef}
                 type="file"
-                name="metrics-weight-csv"
+                name="metrics-share-csv"
                 accept=".csv,text/csv,text/plain"
                 className="sr-only"
                 onChange={(event) => {
@@ -248,7 +248,7 @@ export function WeightCsvImportDialog({
                   <thead className="sticky top-0 bg-muted/90 text-left text-xs tracking-wide text-muted-foreground uppercase">
                     <tr>
                       <th className="px-3 py-2 font-semibold">Address</th>
-                      <th className="w-24 px-3 py-2 font-semibold">Weight</th>
+                      <th className="w-24 px-3 py-2 font-semibold">Share</th>
                       <th className="w-32 px-3 py-2 font-semibold">Result</th>
                       <th className="px-3 py-2 font-semibold">Reason</th>
                     </tr>
@@ -257,7 +257,7 @@ export function WeightCsvImportDialog({
                     {rows.map((row) => (
                       <tr key={`${row.line}-${row.address}`} className="border-t">
                         <td className="px-3 py-2 break-all">{row.address || '—'}</td>
-                        <td className="px-3 py-2 tabular-nums">{row.weight || '—'}</td>
+                        <td className="px-3 py-2 tabular-nums">{row.share || '—'}</td>
                         <td className="px-3 py-2">
                           <Badge variant={statusVariant(row.status)}>{statusLabel(row.status)}</Badge>
                         </td>
@@ -292,10 +292,10 @@ export function WeightCsvImportDialog({
   )
 }
 
-function statusVariant(status: WeightImportStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
+function statusVariant(status: ShareImportStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
   if (status === 'updated') return 'default'
   if (status === 'unchanged') return 'secondary'
-  if (status === 'blocked' || status === 'invalid_weight' || status === 'not_found') return 'destructive'
+  if (status === 'blocked' || status === 'invalid_share' || status === 'not_found') return 'destructive'
   return 'outline'
 }
 

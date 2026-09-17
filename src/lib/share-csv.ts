@@ -1,35 +1,45 @@
 import { parseCsv, stringifyCsv } from '@/lib/csv'
 import { campaignDisplayName, groupCampaignsByCity, normalizeAddress } from '@/lib/place'
 import type { Campaign } from '@/lib/types'
-import { formatWeight, parseWeight, roundWeight, validateWeights } from '@/lib/weights'
+import { formatShare, parseShare, roundShare, validateShares } from '@/lib/shares'
 
 const ADDRESS_HEADERS = ['address', 'campaign address']
-const WEIGHT_HEADERS = ['weight', 'current weights', 'current weight', 'weights']
+const SHARE_HEADERS = [
+  'share',
+  'shares',
+  'current shares',
+  'current share',
+  'доля магазину',
+  'weight',
+  'current weights',
+  'current weight',
+  'weights',
+]
 
-export type WeightImportStatus =
+export type ShareImportStatus =
   | 'updated'
   | 'unchanged'
   | 'not_found'
-  | 'invalid_weight'
+  | 'invalid_share'
   | 'duplicate'
   | 'empty_address'
   | 'ambiguous'
   | 'blocked'
 
-export type WeightImportRow = {
+export type ShareImportRow = {
   line: number
   address: string
-  weight: string
-  status: WeightImportStatus
+  share: string
+  status: ShareImportStatus
   reason: string
   campaignId?: string
 }
 
-export type WeightImportPlan = {
+export type ShareImportPlan = {
   parseError?: string
-  rows: WeightImportRow[]
-  weights: Array<{ id: string; weight: number }>
-  validation: ReturnType<typeof validateWeights>
+  rows: ShareImportRow[]
+  shares: Array<{ id: string; share: number }>
+  validation: ReturnType<typeof validateShares>
   changedCount: number
   canSave: boolean
 }
@@ -40,35 +50,35 @@ export function campaignExportAddress(campaign: Pick<Campaign, 'address' | 'titl
   return campaignDisplayName(campaign)
 }
 
-export function weightsCsvFilename(now = new Date()): string {
+export function sharesCsvFilename(now = new Date()): string {
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}-cc_shops_weights.csv`
+  return `${year}-${month}-${day}-cc_shops_shares.csv`
 }
 
-export function exportWeightsCsv(
+export function exportSharesCsv(
   campaigns: Campaign[],
   drafts?: Record<string, string>,
 ): string {
-  const rows: Array<Array<string | number>> = [['Address', 'Weight']]
+  const rows: Array<Array<string | number>> = [['Address', 'Share']]
   for (const group of groupCampaignsByCity(campaigns)) {
     for (const campaign of group.campaigns) {
-      rows.push([campaignExportAddress(campaign), currentWeight(campaign, drafts)])
+      rows.push([campaignExportAddress(campaign), currentShare(campaign, drafts)])
     }
   }
   return stringifyCsv(rows)
 }
 
-export type WeightCsvRecord = {
+export type ShareCsvRecord = {
   line: number
   address: string
-  weight: string
+  share: string
 }
 
-export function parseWeightCsvRows(csvText: string): {
+export function parseShareCsvRows(csvText: string): {
   parseError?: string
-  records: WeightCsvRecord[]
+  records: ShareCsvRecord[]
 } {
   const table = parseCsv(csvText)
   if (table.length === 0) {
@@ -77,37 +87,37 @@ export function parseWeightCsvRows(csvText: string): {
 
   const headers = table[0].map((cell) => normalizeHeader(cell))
   const addressIndex = headerIndex(headers, ADDRESS_HEADERS)
-  const weightIndex = headerIndex(headers, WEIGHT_HEADERS)
-  if (addressIndex < 0 || weightIndex < 0) {
-    return { parseError: 'CSV must include Address and Weight columns.', records: [] }
+  const shareIndex = headerIndex(headers, SHARE_HEADERS)
+  if (addressIndex < 0 || shareIndex < 0) {
+    return { parseError: 'CSV must include Address and Share columns.', records: [] }
   }
 
   return {
     records: table.slice(1).map((cells, offset) => ({
       line: offset + 2,
       address: (cells[addressIndex] ?? '').trim(),
-      weight: (cells[weightIndex] ?? '').trim(),
+      share: (cells[shareIndex] ?? '').trim(),
     })),
   }
 }
 
-export function createWeightImportState(
+export function createShareImportState(
   campaigns: Campaign[],
   drafts?: Record<string, string>,
 ) {
   const index = indexCampaigns(campaigns)
   const seen = new Map<string, number>()
-  const nextWeights = new Map(
-    campaigns.map((campaign) => [campaign.id, currentNumericWeight(campaign, drafts)]),
+  const nextShares = new Map(
+    campaigns.map((campaign) => [campaign.id, currentNumericShare(campaign, drafts)]),
   )
 
-  function process(record: WeightCsvRecord): WeightImportRow {
-    const { line, address, weight: weightRaw } = record
+  function process(record: ShareCsvRecord): ShareImportRow {
+    const { line, address, share: shareRaw } = record
     if (!address) {
       return {
         line,
         address,
-        weight: weightRaw,
+        share: shareRaw,
         status: 'empty_address',
         reason: 'Missing address.',
       }
@@ -119,21 +129,21 @@ export function createWeightImportState(
       return {
         line,
         address,
-        weight: weightRaw,
+        share: shareRaw,
         status: 'duplicate',
         reason: `Duplicate address (already seen on row ${previousLine}).`,
       }
     }
     seen.set(key, line)
 
-    const weight = parseCsvWeight(weightRaw)
-    if (weight == null || weight < 0) {
+    const share = parseCsvShare(shareRaw)
+    if (share == null || share < 0) {
       return {
         line,
         address,
-        weight: weightRaw,
-        status: 'invalid_weight',
-        reason: 'Weight must be 0 or greater.',
+        share: shareRaw,
+        status: 'invalid_share',
+        reason: 'Share must be 0 or greater.',
       }
     }
 
@@ -142,7 +152,7 @@ export function createWeightImportState(
       return {
         line,
         address,
-        weight: weightRaw,
+        share: shareRaw,
         status: 'not_found',
         reason: 'Address was not found.',
       }
@@ -151,68 +161,68 @@ export function createWeightImportState(
       return {
         line,
         address,
-        weight: weightRaw,
+        share: shareRaw,
         status: 'ambiguous',
         reason: 'Multiple shops share this address.',
       }
     }
 
     const campaign = matches[0]
-    const rounded = roundWeight(weight)
-    const unchanged = rounded === nextWeights.get(campaign.id)
-    nextWeights.set(campaign.id, rounded)
+    const rounded = roundShare(share)
+    const unchanged = rounded === nextShares.get(campaign.id)
+    nextShares.set(campaign.id, rounded)
     return {
       line,
       address,
-      weight: formatWeight(rounded),
+      share: formatShare(rounded),
       status: unchanged ? 'unchanged' : 'updated',
-      reason: unchanged ? 'Weight already matches.' : 'Updated.',
+      reason: unchanged ? 'Share already matches.' : 'Updated.',
       campaignId: campaign.id,
     }
   }
 
-  function finish(rows: WeightImportRow[]): WeightImportPlan {
+  function finish(rows: ShareImportRow[]): ShareImportPlan {
     const merged = campaigns.map((campaign) => ({
       id: campaign.id,
-      weight: nextWeights.get(campaign.id) ?? 0,
+      share: nextShares.get(campaign.id) ?? 0,
     }))
-    const validation = validateWeights(merged.map((item) => item.weight))
-    const weights = rows
+    const validation = validateShares(merged.map((item) => item.share))
+    const shares = rows
       .filter((row) => row.status === 'updated' && row.campaignId)
       .map((row) => ({
         id: row.campaignId as string,
-        weight: nextWeights.get(row.campaignId as string) ?? 0,
+        share: nextShares.get(row.campaignId as string) ?? 0,
       }))
     return {
       rows,
-      weights,
+      shares,
       validation,
-      changedCount: weights.length,
-      canSave: weights.length > 0,
+      changedCount: shares.length,
+      canSave: shares.length > 0,
     }
   }
 
   return { process, finish }
 }
 
-export function planWeightImport(
+export function planShareImport(
   campaigns: Campaign[],
   csvText: string,
   drafts?: Record<string, string>,
-): WeightImportPlan {
-  const parsed = parseWeightCsvRows(csvText)
+): ShareImportPlan {
+  const parsed = parseShareCsvRows(csvText)
   if (parsed.parseError) return emptyImportPlan(parsed.parseError)
-  const importer = createWeightImportState(campaigns, drafts)
+  const importer = createShareImportState(campaigns, drafts)
   const rows = parsed.records.map((record) => importer.process(record))
   return importer.finish(rows)
 }
 
-export function importCounts(rows: WeightImportRow[]): { updated: number; notUpdated: number } {
+export function importCounts(rows: ShareImportRow[]): { updated: number; notUpdated: number } {
   const updated = rows.filter((row) => row.status === 'updated').length
   return { updated, notUpdated: rows.length - updated }
 }
 
-export function statusLabel(status: WeightImportStatus): string {
+export function statusLabel(status: ShareImportStatus): string {
   switch (status) {
     case 'updated':
       return 'Updated'
@@ -220,8 +230,8 @@ export function statusLabel(status: WeightImportStatus): string {
       return 'Unchanged'
     case 'not_found':
       return 'Not found'
-    case 'invalid_weight':
-      return 'Invalid weight'
+    case 'invalid_share':
+      return 'Invalid share'
     case 'duplicate':
       return 'Duplicate'
     case 'empty_address':
@@ -233,11 +243,11 @@ export function statusLabel(status: WeightImportStatus): string {
   }
 }
 
-export function emptyImportPlan(parseError: string): WeightImportPlan {
+export function emptyImportPlan(parseError: string): ShareImportPlan {
   return {
     parseError,
     rows: [],
-    weights: [],
+    shares: [],
     validation: { ok: false, total: 0, error: parseError },
     changedCount: 0,
     canSave: false,
@@ -256,20 +266,20 @@ function indexCampaigns(campaigns: Campaign[]): Map<string, Campaign[]> {
   return index
 }
 
-function currentWeight(campaign: Campaign, drafts?: Record<string, string>): string {
-  return formatWeight(currentNumericWeight(campaign, drafts))
+function currentShare(campaign: Campaign, drafts?: Record<string, string>): string {
+  return formatShare(currentNumericShare(campaign, drafts))
 }
 
-function currentNumericWeight(campaign: Campaign, drafts?: Record<string, string>): number {
+function currentNumericShare(campaign: Campaign, drafts?: Record<string, string>): number {
   if (drafts && Object.prototype.hasOwnProperty.call(drafts, campaign.id)) {
-    const parsed = parseCsvWeight(drafts[campaign.id] ?? '')
-    if (parsed != null && parsed >= 0) return roundWeight(parsed)
+    const parsed = parseCsvShare(drafts[campaign.id] ?? '')
+    if (parsed != null && parsed >= 0) return roundShare(parsed)
   }
-  return roundWeight(campaign.weight)
+  return roundShare(campaign.share)
 }
 
-function parseCsvWeight(raw: string): number | null {
-  return parseWeight(raw.replace(/%/g, ''))
+function parseCsvShare(raw: string): number | null {
+  return parseShare(raw.replace(/%/g, ''))
 }
 
 function normalizeHeader(value: string): string {

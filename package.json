@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "oxlint",
-    "test": "tsx --test src/server/maps-url.test.ts src/lib/place.test.ts src/lib/scrape.test.ts src/lib/search-params.test.ts src/lib/weights.test.ts src/lib/csv.test.ts src/lib/weight-csv.test.ts"
+    "test": "tsx --test src/server/maps-url.test.ts src/lib/place.test.ts src/lib/scrape.test.ts src/lib/search-params.test.ts src/lib/shares.test.ts src/lib/csv.test.ts src/lib/share-csv.test.ts"
   },
   "dependencies": {
     "@floating-ui/react-dom": "^2.1.9",

@@ -32,6 +32,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { campaignDisplayName, cityFromAddress, groupCampaignsByCity } from '@/lib/place'
 import { formatCampaignRating } from '@/lib/reviews'
 import { formatScrapedAt, scrapeLimitMessage, wasScrapedToday } from '@/lib/scrape'
+import { formatWeightedAverage, shareWeightedAverage } from '@/lib/shares'
 import type { Campaign, CompanySort } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -191,8 +192,8 @@ export function CampaignSidebar({
           <MetricTile
             icon={StarIcon}
             iconClassName="fill-amber-400 text-amber-400"
-            label="Avg rating"
-            value={ratingMetrics.average != null ? formatCampaignRating(ratingMetrics.average) : '—'}
+            label="Wtd. rating"
+            value={ratingMetrics.average != null ? formatWeightedAverage(ratingMetrics.average) : '—'}
           />
           <MetricTile
             icon={ArrowDownIcon}
@@ -403,10 +404,17 @@ function campaignRatingMetrics(campaigns: Campaign[]): {
     return { count: campaigns.length, average: null, min: null, max: null }
   }
 
+  const weighted = shareWeightedAverage(
+    campaigns.flatMap((campaign) => {
+      if (campaign.rating == null || !Number.isFinite(campaign.rating)) return []
+      return [{ share: campaign.share, value: campaign.rating }]
+    }),
+  )
   const sum = ratings.reduce((total, rating) => total + rating, 0)
+
   return {
     count: campaigns.length,
-    average: sum / ratings.length,
+    average: weighted ?? sum / ratings.length,
     min: Math.min(...ratings),
     max: Math.max(...ratings),
   }

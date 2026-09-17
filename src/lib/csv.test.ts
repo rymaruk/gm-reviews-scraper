@@ -5,18 +5,18 @@ import { parseCsv, stringifyCsv } from './csv'
 
 describe('parseCsv', () => {
   it('parses quoted commas and escaped quotes', () => {
-    const rows = parseCsv('Address,Weight\n"Main St, 1, Lutsk",12.5\n"Shop ""Castle""",0')
+    const rows = parseCsv('Address,Share\n"Main St, 1, Lutsk",12.5\n"Shop ""Castle""",0')
     assert.deepEqual(rows, [
-      ['Address', 'Weight'],
+      ['Address', 'Share'],
       ['Main St, 1, Lutsk', '12.5'],
       ['Shop "Castle"', '0'],
     ])
   })
 
   it('strips a BOM and skips blank lines', () => {
-    const rows = parseCsv('\uFEFFAddress,Weight\n\nLutsk,10\n')
+    const rows = parseCsv('\uFEFFAddress,Share\n\nLutsk,10\n')
     assert.deepEqual(rows, [
-      ['Address', 'Weight'],
+      ['Address', 'Share'],
       ['Lutsk', '10'],
     ])
   })
@@ -25,11 +25,11 @@ describe('parseCsv', () => {
 describe('stringifyCsv', () => {
   it('round-trips quoted fields', () => {
     const csv = stringifyCsv([
-      ['Address', 'Weight'],
+      ['Address', 'Share'],
       ['Main St, 1', '12.5'],
     ])
     assert.deepEqual(parseCsv(csv), [
-      ['Address', 'Weight'],
+      ['Address', 'Share'],
       ['Main St, 1', '12.5'],
     ])
   })

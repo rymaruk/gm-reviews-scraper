@@ -21,7 +21,8 @@ type CampaignRow = {
   scrape_status: Campaign['scrapeStatus']
   scrape_error: string | null
   next_page_token: string | null
-  weight: number
+  share?: number | null
+  weight?: number | null
 }
 
 type ReviewRow = {
@@ -97,12 +98,12 @@ export async function deleteCampaign(id: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
-export async function updateCampaignWeights(
-  weights: Array<{ id: string; weight: number }>,
+export async function updateCampaignShares(
+  shares: Array<{ id: string; share: number }>,
 ): Promise<void> {
   const supabase = getSupabase()
-  for (const item of weights) {
-    const { error } = await supabase.from('campaigns').update({ weight: item.weight }).eq('id', item.id)
+  for (const item of shares) {
+    const { error } = await supabase.from('campaigns').update({ share: item.share }).eq('id', item.id)
     if (error) throw new Error(error.message)
   }
 }
@@ -146,7 +147,7 @@ function toCampaignRow(campaign: Campaign): CampaignRow {
     scrape_status: campaign.scrapeStatus,
     scrape_error: campaign.scrapeError ?? null,
     next_page_token: campaign.nextPageToken ?? null,
-    weight: campaign.weight,
+    share: campaign.share,
   }
 }
 
@@ -167,13 +168,13 @@ function fromCampaignRow(row: CampaignRow): Campaign {
     scrapeStatus: row.scrape_status === 'scraping' ? 'idle' : row.scrape_status,
     scrapeError: row.scrape_error ?? undefined,
     nextPageToken: row.next_page_token ?? undefined,
-    weight: asWeight(row.weight),
+    share: asShare(row.share ?? row.weight),
   }
 }
 
-function asWeight(value: unknown): number {
-  const weight = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(weight) ? weight : 0
+function asShare(value: unknown): number {
+  const share = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(share) ? share : 0
 }
 
 function toReviewRow(review: StoredReview): ReviewRow {

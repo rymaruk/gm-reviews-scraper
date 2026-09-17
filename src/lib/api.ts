@@ -32,13 +32,13 @@ export async function fetchCampaigns(): Promise<{ campaigns: Campaign[] }> {
   return parseJson(response)
 }
 
-export async function updateCampaignWeights(
-  weights: Array<{ id: string; weight: number }>,
+export async function updateCampaignShares(
+  shares: Array<{ id: string; share: number }>,
 ): Promise<void> {
-  const response = await fetch('/api/campaigns/weights', {
+  const response = await fetch('/api/campaigns/shares', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ weights }),
+    body: JSON.stringify({ shares }),
   })
   await parseJson(response)
 }

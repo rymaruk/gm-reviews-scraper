@@ -17,8 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { WeightCsvImportDialog } from '@/components/weight-csv-import-dialog'
-import { updateCampaignWeights } from '@/lib/api'
+import { ShareCsvImportDialog } from '@/components/share-csv-import-dialog'
+import { updateCampaignShares } from '@/lib/api'
 import { downloadCsv } from '@/lib/csv'
 import {
   campaignCities,
@@ -35,17 +35,19 @@ import {
   type ActiveFilterId,
   type FilterParams,
 } from '@/lib/search-params'
+import { exportSharesCsv, sharesCsvFilename } from '@/lib/share-csv'
+import {
+  SHARE_EPSILON,
+  SHARE_TOTAL,
+  formatShare,
+  formatWeightedAverage,
+  parseShare,
+  roundShare,
+  shareWeightedAverage,
+  sharesTotal,
+} from '@/lib/shares'
 import type { Campaign } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import {
-  WEIGHT_EPSILON,
-  WEIGHT_TOTAL,
-  formatWeight,
-  parseWeight,
-  roundWeight,
-  weightsTotal,
-} from '@/lib/weights'
-import { exportWeightsCsv, weightsCsvFilename } from '@/lib/weight-csv'
 
 const AUTOSAVE_MS = 1000
 
@@ -97,64 +99,73 @@ export function MetricsGrid({
     applyMetricFilters(resetActiveFilters())
   }
 
-  const parsedWeights = campaigns.map((campaign) => parseWeight(drafts[campaign.id] ?? ''))
-  const numericWeights = parsedWeights.filter((value): value is number => value != null)
-  const invalidRow = parsedWeights.some((value) => value == null || value < 0)
-  const total = weightsTotal(numericWeights)
-  const totalOk = !invalidRow && Math.abs(total - WEIGHT_TOTAL) <= WEIGHT_EPSILON
-  const remaining = roundWeight(WEIGHT_TOTAL - total)
+  const parsedShares = campaigns.map((campaign) => parseShare(drafts[campaign.id] ?? ''))
+  const numericShares = parsedShares.filter((value): value is number => value != null)
+  const invalidRow = parsedShares.some((value) => value == null || value < 0)
+  const total = sharesTotal(numericShares)
+  const totalOk = !invalidRow && Math.abs(total - SHARE_TOTAL) <= SHARE_EPSILON
+  const remaining = roundShare(SHARE_TOTAL - total)
   const dirty = campaigns.some(
-    (campaign) => parseWeight(drafts[campaign.id] ?? '') !== roundWeight(campaign.weight),
+    (campaign) => parseShare(drafts[campaign.id] ?? '') !== roundShare(campaign.share),
   )
   const filtersActive = Boolean(filter.trim()) || city !== 'all'
+  const weightedRating = shareWeightedAverage(
+    campaigns.flatMap((campaign) => {
+      const share = parseShare(drafts[campaign.id] ?? '')
+      if (share == null || share <= 0 || campaign.rating == null || !Number.isFinite(campaign.rating)) {
+        return []
+      }
+      return [{ share, value: campaign.rating }]
+    }),
+  )
 
-  const persistWeights = useCallback(async (nextDrafts: Record<string, string>) => {
+  const persistShares = useCallback(async (nextDrafts: Record<string, string>) => {
     const parsed = campaigns.map((campaign) => ({
       id: campaign.id,
-      value: parseWeight(nextDrafts[campaign.id] ?? ''),
+      value: parseShare(nextDrafts[campaign.id] ?? ''),
     }))
     const invalid = parsed.filter((item) => item.value == null || item.value < 0)
-    const weights = parsed.flatMap((item) => {
+    const shares = parsed.flatMap((item) => {
       if (item.value == null || item.value < 0) return []
       const campaign = campaigns.find((row) => row.id === item.id)
-      const weight = roundWeight(item.value)
-      if (!campaign || roundWeight(campaign.weight) === weight) return []
-      return [{ id: item.id, weight }]
+      const share = roundShare(item.value)
+      if (!campaign || roundShare(campaign.share) === share) return []
+      return [{ id: item.id, share }]
     })
 
-    if (weights.length === 0) {
-      if (invalid.length > 0) toast.error('Each weight must be 0 or greater.')
+    if (shares.length === 0) {
+      if (invalid.length > 0) toast.error('Each share must be 0 or greater.')
       return
     }
 
     setSaving(true)
     try {
-      await updateCampaignWeights(weights)
+      await updateCampaignShares(shares)
       setCampaigns((current) =>
         current.map((campaign) => {
-          const next = weights.find((item) => item.id === campaign.id)
-          return next ? { ...campaign, weight: next.weight } : campaign
+          const next = shares.find((item) => item.id === campaign.id)
+          return next ? { ...campaign, share: next.share } : campaign
         }),
       )
       setDrafts((current) => {
         const next = { ...current }
-        for (const item of weights) {
+        for (const item of shares) {
           if (current[item.id] === nextDrafts[item.id]) {
-            next[item.id] = formatWeight(item.weight)
+            next[item.id] = formatShare(item.share)
           }
         }
         return next
       })
-      toast.success('Weights updated')
+      toast.success('Shares updated')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not save weights.')
+      toast.error(error instanceof Error ? error.message : 'Could not save shares.')
     } finally {
       setSaving(false)
     }
   }, [campaigns])
 
-  const persistRef = useRef(persistWeights)
-  persistRef.current = persistWeights
+  const persistRef = useRef(persistShares)
+  persistRef.current = persistShares
 
   useEffect(() => {
     if (editVersion === 0) return
@@ -173,28 +184,28 @@ export function MetricsGrid({
   }
 
   function commitDraft(id: string) {
-    const parsed = parseWeight(drafts[id] ?? '')
+    const parsed = parseShare(drafts[id] ?? '')
     if (parsed == null || parsed < 0) return
-    const formatted = formatWeight(parsed)
+    const formatted = formatShare(parsed)
     if (formatted === (drafts[id] ?? '')) return
     setDraft(id, formatted)
   }
 
   function exportCsv() {
-    downloadCsv(weightsCsvFilename(), exportWeightsCsv(campaigns, drafts))
+    downloadCsv(sharesCsvFilename(), exportSharesCsv(campaigns, drafts))
   }
 
-  function applyImportedWeights(weights: Array<{ id: string; weight: number }>) {
+  function applyImportedShares(shares: Array<{ id: string; share: number }>) {
     setCampaigns((current) =>
       current.map((campaign) => {
-        const next = weights.find((item) => item.id === campaign.id)
-        return next ? { ...campaign, weight: next.weight } : campaign
+        const next = shares.find((item) => item.id === campaign.id)
+        return next ? { ...campaign, share: next.share } : campaign
       }),
     )
     setDrafts((current) => {
       const next = { ...current }
-      for (const item of weights) {
-        next[item.id] = formatWeight(item.weight)
+      for (const item of shares) {
+        next[item.id] = formatShare(item.share)
       }
       return next
     })
@@ -210,8 +221,9 @@ export function MetricsGrid({
             <MetricsBreadcrumb />
             <h1 className="font-heading text-3xl font-medium">Metrics</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Assign a weight to each shop. Values can be 0 or greater, and the total should be {WEIGHT_TOTAL}%.
-              Each shop saves automatically after you stop typing.
+              Assign a share to each shop. Values can be 0 or greater, and the total should be {SHARE_TOTAL}%.
+              The weighted Google Maps rating is SUMPRODUCT(share, rating) / SUM(share). Each shop saves
+              automatically after you stop typing.
             </p>
           </div>
 
@@ -221,7 +233,7 @@ export function MetricsGrid({
             </div>
           ) : campaigns.length === 0 ? (
             <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-              Add a shop on the reviews page before setting weights.
+              Add a shop on the reviews page before setting shares.
             </div>
           ) : (
             <>
@@ -278,7 +290,7 @@ export function MetricsGrid({
                     <thead className="sticky top-0 z-10 bg-muted/90 text-left text-xs tracking-wide text-muted-foreground uppercase backdrop-blur-sm">
                       <tr>
                         <th className="px-4 py-3 font-semibold">Address</th>
-                        <th className="w-44 px-4 py-3 text-right font-semibold">Weight</th>
+                        <th className="w-44 px-4 py-3 text-right font-semibold">Share</th>
                       </tr>
                     </thead>
                     {grouped.map((group) => (
@@ -294,7 +306,7 @@ export function MetricsGrid({
                         </tr>
                         {group.campaigns.map((campaign) => {
                           const raw = drafts[campaign.id] ?? ''
-                          const parsed = parseWeight(raw)
+                          const parsed = parseShare(raw)
                           const rowInvalid = parsed == null || parsed < 0
                           const name = campaignDisplayName(campaign)
                           const reviewsCount = campaign.reviewsCount ?? 0
@@ -326,14 +338,14 @@ export function MetricsGrid({
                                   {rowSaving ? (
                                     <Loader2Icon
                                       className="size-4 shrink-0 animate-spin text-muted-foreground"
-                                      aria-label="Saving weight"
+                                      aria-label="Saving share"
                                     />
                                   ) : null}
                                   <Input
                                     type="text"
                                     inputMode="decimal"
                                     value={raw}
-                                    aria-label={`Weight for ${name}`}
+                                    aria-label={`Share for ${name}`}
                                     aria-invalid={rowInvalid}
                                     className="w-24 text-right tabular-nums"
                                     onChange={(event) => setDraft(campaign.id, event.target.value)}
@@ -368,31 +380,35 @@ export function MetricsGrid({
             aria-live="polite"
           >
             {saving
-              ? 'Saving weights…'
+              ? 'Saving shares…'
               : invalidRow
-                ? 'Each weight must be 0 or greater.'
+                ? 'Each share must be 0 or greater.'
                 : `${
                     totalOk
-                      ? `Total: ${WEIGHT_TOTAL}%`
+                      ? `Total: ${SHARE_TOTAL}%`
                       : remaining > 0
-                        ? `Total: ${formatWeight(total)}% (${formatWeight(remaining)}% remaining)`
-                        : `Total: ${formatWeight(total)}% (${formatWeight(Math.abs(remaining))}% over)`
+                        ? `Total: ${formatShare(total)}% (${formatShare(remaining)}% remaining)`
+                        : `Total: ${formatShare(total)}% (${formatShare(Math.abs(remaining))}% over)`
+                  }${
+                    weightedRating != null
+                      ? ` · Weighted Google Maps rating: ${formatWeightedAverage(weightedRating)}`
+                      : ''
                   }${dirty ? ' · Saving shortly' : ''}`}
             {filtersActive ? ` · Showing ${visible.length} of ${campaigns.length}` : null}
           </p>
         </div>
       ) : null}
-      <WeightCsvImportDialog
+      <ShareCsvImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
         campaigns={campaigns}
         drafts={drafts}
-        onImported={applyImportedWeights}
+        onImported={applyImportedShares}
       />
     </div>
   )
 }
 
 function draftsFromCampaigns(campaigns: Campaign[]): Record<string, string> {
-  return Object.fromEntries(campaigns.map((campaign) => [campaign.id, formatWeight(campaign.weight)]))
+  return Object.fromEntries(campaigns.map((campaign) => [campaign.id, formatShare(campaign.share)]))
 }
