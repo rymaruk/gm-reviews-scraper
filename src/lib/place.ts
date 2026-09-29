@@ -140,8 +140,19 @@ export function campaignCities(campaigns: Array<Pick<Campaign, 'address'>>): str
 
 export function groupCampaignsByCity(
   campaigns: Campaign[],
-  companySort: CompanySort = 'rating-desc',
+  sort: CompanySort | ((left: Campaign, right: Campaign) => number) = 'rating-desc',
 ): Array<{ city: string; campaigns: Campaign[] }> {
+  const compare =
+    typeof sort === 'function'
+      ? (left: Campaign | undefined, right: Campaign | undefined) => {
+          if (!left && !right) return 0
+          if (!left) return 1
+          if (!right) return -1
+          return sort(left, right)
+        }
+      : (left: Campaign | undefined, right: Campaign | undefined) =>
+          compareCampaignsByRating(left, right, sort)
+
   const groups = new Map<string, { city: string; campaigns: Campaign[] }>()
   const unknown: Campaign[] = []
 
@@ -159,17 +170,17 @@ export function groupCampaignsByCity(
   }
 
   for (const group of groups.values()) {
-    group.campaigns.sort((left, right) => compareCampaignsByRating(left, right, companySort))
+    group.campaigns.sort(compare)
   }
 
   const sorted = [...groups.values()].sort((left, right) => {
-    const ratingCmp = compareCampaignsByRating(left.campaigns[0], right.campaigns[0], companySort)
-    if (ratingCmp !== 0) return ratingCmp
+    const cmp = compare(left.campaigns[0], right.campaigns[0])
+    if (cmp !== 0) return cmp
     return left.city.localeCompare(right.city)
   })
 
   if (unknown.length > 0) {
-    unknown.sort((left, right) => compareCampaignsByRating(left, right, companySort))
+    unknown.sort(compare)
     sorted.push({ city: 'Unknown city', campaigns: unknown })
   }
 

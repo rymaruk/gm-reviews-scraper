@@ -16,6 +16,7 @@ export type ScrapeDialogState =
   | { status: 'idle' }
   | { status: 'running'; name: string }
   | { status: 'error'; name: string; message: string }
+  | { status: 'incomplete'; addresses: string[] }
 
 export function ScrapeProgressDialog({
   state,
@@ -26,6 +27,7 @@ export function ScrapeProgressDialog({
 }) {
   const running = state.status === 'running'
   const errored = state.status === 'error'
+  const incomplete = state.status === 'incomplete'
 
   return (
     <Dialog
@@ -35,7 +37,7 @@ export function ScrapeProgressDialog({
       }}
     >
       <DialogContent
-        showCloseButton={errored}
+        showCloseButton={errored || incomplete}
         onPointerDownOutside={(event) => {
           if (running) event.preventDefault()
         }}
@@ -47,7 +49,13 @@ export function ScrapeProgressDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>{errored ? 'Scraping failed' : 'Scraping reviews'}</DialogTitle>
+          <DialogTitle>
+            {errored
+              ? 'Scraping failed'
+              : incomplete
+                ? 'Some addresses were not updated'
+                : 'Scraping reviews'}
+          </DialogTitle>
           <DialogDescription asChild>
             {running ? (
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -58,10 +66,19 @@ export function ScrapeProgressDialog({
               <p>
                 Could not finish scraping {state.name}. {state.message}
               </p>
+            ) : incomplete ? (
+              <div className="text-sm text-muted-foreground">
+                <p>Scraping finished. These addresses were not updated:</p>
+                <ul className="mt-3 max-h-60 list-disc space-y-1 overflow-y-auto pl-5 text-foreground">
+                  {state.addresses.map((address, index) => (
+                    <li key={`${address}-${index}`}>{address}</li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
           </DialogDescription>
         </DialogHeader>
-        {errored ? (
+        {errored || incomplete ? (
           <DialogFooter>
             <Button type="button" onClick={onClose}>
               Close

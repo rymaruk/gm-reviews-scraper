@@ -22,7 +22,7 @@ import {
 } from '@/lib/api'
 import { campaignCities, campaignDisplayName, campaignMatchesCity, groupCampaignsByCity, placeNameFromMapsUrl, preferName } from '@/lib/place'
 import { filterReviews, mergeReviews, reviewsToCsv } from '@/lib/reviews'
-import { formatScrapedAt, scrapeLimitMessage, wasScrapedToday } from '@/lib/scrape'
+import { formatScrapedAt, isSkippableScrapeError, scrapeLimitMessage, wasScrapedToday } from '@/lib/scrape'
 import {
   clearActiveFilter,
   listActiveFilters,
@@ -353,11 +353,11 @@ export function ReviewsApp({
           selectCompany(id)
 
           if (result.nextPageToken) {
-            const ok = await scrapeCampaign(
+            const outcome = await scrapeCampaign(
               { ...campaign, nextPageToken: result.nextPageToken },
               { closeOnSuccess: false },
             )
-            if (!ok) return
+            if (outcome !== 'done') return
           }
           setScrapeDialog({ status: 'idle' })
         } catch (error) {
@@ -393,11 +393,11 @@ export function ReviewsApp({
 
   async function scrapeCampaign(
     campaign: Campaign,
-    options?: { reset?: boolean; closeOnSuccess?: boolean },
-  ): Promise<boolean> {
+    options?: { reset?: boolean; closeOnSuccess?: boolean; onShopError?: 'stop' | 'skip' },
+  ): Promise<'done' | 'skipped' | 'stopped'> {
     if (options?.reset && wasScrapedToday(campaign.lastScrapedAt)) {
       toast.error(scrapeLimitMessage(campaign))
-      return false
+      return 'stopped'
     }
 
     const fallbackName = campaignDisplayName(campaign)
@@ -468,7 +468,7 @@ export function ReviewsApp({
       await reloadStore().catch(() => undefined)
       toast.success(`Finished scraping ${fallbackName}`)
       if (options?.closeOnSuccess !== false) setScrapeDialog({ status: 'idle' })
-      return true
+      return 'done'
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Scrape failed.'
       setCampaigns((current) =>
@@ -482,9 +482,10 @@ export function ReviewsApp({
         () => undefined,
       )
       await reloadStore().catch(() => undefined)
+      if (options?.onShopError === 'skip' && isSkippableScrapeError(message)) return 'skipped'
       toast.error(message)
       setScrapeDialog({ status: 'error', name: fallbackName, message })
-      return false
+      return 'stopped'
     }
   }
 
@@ -500,9 +501,28 @@ export function ReviewsApp({
         `Skipping ${skipped} shop${skipped === 1 ? '' : 's'} already scraped today.`,
       )
     }
+    const missed: string[] = []
     for (const campaign of due) {
-      const ok = await scrapeCampaign(campaign, { reset: true, closeOnSuccess: false })
-      if (!ok) return
+      const outcome = await scrapeCampaign(campaign, {
+        reset: true,
+        closeOnSuccess: false,
+        onShopError: 'skip',
+      })
+      if (outcome === 'stopped') {
+        setScrapeDialog((current) => {
+          if (current.status === 'error') return current
+          if (missed.length > 0) return { status: 'incomplete', addresses: missed }
+          return { status: 'idle' }
+        })
+        return
+      }
+      if (outcome === 'skipped') {
+        missed.push(campaign.address?.trim() || campaignDisplayName(campaign))
+      }
+    }
+    if (missed.length > 0) {
+      setScrapeDialog({ status: 'incomplete', addresses: missed })
+      return
     }
     setScrapeDialog({ status: 'idle' })
   }

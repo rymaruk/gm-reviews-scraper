@@ -25,6 +25,10 @@ export function formatScrapedAt(value: string | Date): string {
   }).format(date)
 }
 
+export function isSkippableScrapeError(message: string): boolean {
+  return /hasn't returned any results/i.test(message)
+}
+
 export function scrapeLimitMessage(
   campaign: Pick<Campaign, 'title' | 'mapsUrl' | 'address' | 'lastScrapedAt'>,
 ): string {

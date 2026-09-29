@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { scrapeLimitMessage, wasScrapedToday } from './scrape'
+import { isSkippableScrapeError, scrapeLimitMessage, wasScrapedToday } from './scrape'
 
 describe('wasScrapedToday', () => {
   it('is true for a timestamp on the same calendar day', () => {
@@ -16,6 +16,20 @@ describe('wasScrapedToday', () => {
 
   it('is false when the campaign has never been scraped', () => {
     assert.equal(wasScrapedToday(undefined), false)
+  })
+})
+
+describe('isSkippableScrapeError', () => {
+  it('skips a listing Google no longer returns', () => {
+    assert.equal(
+      isSkippableScrapeError("Google hasn't returned any results for this query."),
+      true,
+    )
+  })
+
+  it('does not skip account or network failures', () => {
+    assert.equal(isSkippableScrapeError('Your account has run out of searches.'), false)
+    assert.equal(isSkippableScrapeError('SerpAPI request failed.'), false)
   })
 })
 

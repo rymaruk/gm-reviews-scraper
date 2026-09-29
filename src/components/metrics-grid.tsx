@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import Link from 'next/link'
 import {
+  ArrowDownAZIcon,
+  ArrowDownWideNarrowIcon,
+  ArrowUpNarrowWideIcon,
+  ArrowUpZAIcon,
+  CalendarArrowDownIcon,
+  CalendarArrowUpIcon,
   CalendarDaysIcon,
   DownloadIcon,
   InfoIcon,
@@ -33,10 +39,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { updateCampaignShares } from '@/lib/api'
 import { downloadCsv } from '@/lib/csv'
 import {
+  defaultDirectionForColumn,
+  defaultMetricsSort,
+  groupCampaignsForMetrics,
+  nextMetricsSort,
+  type MetricsSort,
+  type MetricsSortColumn,
+} from '@/lib/metrics-sort'
+import {
   campaignCities,
   campaignDisplayName,
   campaignMatchesCity,
-  groupCampaignsByCity,
 } from '@/lib/place'
 import {
   daysSinceLastReview,
@@ -88,6 +101,7 @@ export function MetricsGrid({
   const draftsRef = useRef(drafts)
   draftsRef.current = drafts
   const [importOpen, setImportOpen] = useState(false)
+  const [sort, setSort] = useState<MetricsSort>(defaultMetricsSort)
   const cities = useMemo(() => campaignCities(campaigns), [campaigns])
   const visible = useMemo(() => {
     const query = filter.trim().toLowerCase()
@@ -99,7 +113,10 @@ export function MetricsGrid({
       return name.includes(query) || address.includes(query)
     })
   }, [campaigns, city, filter])
-  const grouped = useMemo(() => groupCampaignsByCity(visible), [visible])
+  const grouped = useMemo(
+    () => groupCampaignsForMetrics(visible, sort, { drafts, reviewStats: initialReviewStats }),
+    [visible, sort, drafts, initialReviewStats],
+  )
   const currentFilters = useMemo(
     () => ({ ...defaultFilterParams, query: filter, city }),
     [filter, city],
@@ -348,12 +365,30 @@ export function MetricsGrid({
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 z-10 bg-muted/90 text-left text-xs tracking-wide text-muted-foreground uppercase backdrop-blur-sm">
                       <tr>
-                        <th className="px-4 py-3 font-semibold">Address</th>
-                        <th className="w-40 px-4 py-3 font-semibold">Last review</th>
-                        <th className="w-36 px-4 py-3 text-right font-semibold">Reviews</th>
-                        <th className="sticky top-0 right-0 z-20 w-44 bg-muted/90 px-4 py-3 text-right font-semibold shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]">
-                          Share
-                        </th>
+                        <SortHeader label="Address" column="address" sort={sort} onSort={setSort} />
+                        <SortHeader
+                          label="Last review"
+                          column="lastReview"
+                          sort={sort}
+                          onSort={setSort}
+                          className="w-40"
+                        />
+                        <SortHeader
+                          label="Reviews"
+                          column="reviews"
+                          sort={sort}
+                          onSort={setSort}
+                          align="right"
+                          className="w-36"
+                        />
+                        <SortHeader
+                          label="Share"
+                          column="share"
+                          sort={sort}
+                          onSort={setSort}
+                          align="right"
+                          className="sticky top-0 right-0 z-20 w-44 bg-muted/90 shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]"
+                        />
                       </tr>
                     </thead>
                     {grouped.map((group) => (
@@ -492,6 +527,83 @@ export function MetricsGrid({
 
 function draftsFromCampaigns(campaigns: Campaign[]): Record<string, string> {
   return Object.fromEntries(campaigns.map((campaign) => [campaign.id, formatShare(campaign.share)]))
+}
+
+function SortHeader({
+  label,
+  column,
+  sort,
+  onSort,
+  align = 'left',
+  className,
+}: {
+  label: string
+  column: MetricsSortColumn
+  sort: MetricsSort
+  onSort: (next: MetricsSort) => void
+  align?: 'left' | 'right'
+  className?: string
+}) {
+  const active = sort.column === column
+  return (
+    <th
+      aria-sort={active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+      className={cn('px-4 py-3 font-semibold', className)}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(nextMetricsSort(sort, column))}
+        aria-label={metricsSortAriaLabel(label, column, sort)}
+        className={cn(
+          'inline-flex w-full items-center gap-1 rounded-md text-xs tracking-wide uppercase hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
+          align === 'right' ? 'justify-end' : 'justify-start',
+          active ? 'text-foreground' : 'text-muted-foreground',
+        )}
+      >
+        <span>{label}</span>
+        <MetricsSortIcon column={column} sort={sort} />
+      </button>
+    </th>
+  )
+}
+
+function MetricsSortIcon({ column, sort }: { column: MetricsSortColumn; sort: MetricsSort }) {
+  const active = sort.column === column
+  const direction = active ? sort.direction : defaultDirectionForColumn(column)
+  const className = cn('size-3.5 shrink-0', active ? 'text-foreground' : 'opacity-50')
+
+  if (column === 'address') {
+    return direction === 'asc' ? (
+      <ArrowDownAZIcon className={className} aria-hidden />
+    ) : (
+      <ArrowUpZAIcon className={className} aria-hidden />
+    )
+  }
+
+  if (column === 'lastReview') {
+    return direction === 'desc' ? (
+      <CalendarArrowDownIcon className={className} aria-hidden />
+    ) : (
+      <CalendarArrowUpIcon className={className} aria-hidden />
+    )
+  }
+
+  return direction === 'desc' ? (
+    <ArrowDownWideNarrowIcon className={className} aria-hidden />
+  ) : (
+    <ArrowUpNarrowWideIcon className={className} aria-hidden />
+  )
+}
+
+function metricsSortAriaLabel(label: string, column: MetricsSortColumn, sort: MetricsSort): string {
+  const next = nextMetricsSort(sort, column)
+  if (column === 'address') {
+    return next.direction === 'asc' ? `Sort ${label} A to Z` : `Sort ${label} Z to A`
+  }
+  if (column === 'lastReview') {
+    return next.direction === 'desc' ? `Sort ${label} newest first` : `Sort ${label} oldest first`
+  }
+  return next.direction === 'desc' ? `Sort ${label} high to low` : `Sort ${label} low to high`
 }
 
 type LastReviewItem = {
