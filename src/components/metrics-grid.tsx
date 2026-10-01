@@ -699,7 +699,16 @@ function MetricsTotalsPanel({
           info="Each shop’s Google Maps rating is multiplied by its share, then those products are added up and divided by the sum of shares. A shop with 40% share counts four times as much as a shop with 10%. Shops with 0% share are skipped."
           highlight
         />
-        <WeightedDaysTile weightedDays={weightedDays} lastReview={lastReview} />
+        <SummaryTile
+          icon={CalendarDaysIcon}
+          label="Weighted days since last review"
+          value={weightedDays != null ? formatWeightedAverage(weightedDays) : '—'}
+          hint={`Today ${formatLastReviewDate(todayIsoDay())}`}
+          formula="SUMPRODUCT(share / 100, days)"
+          info="Each shop’s whole days from its last review to today is multiplied by its share (as a fraction of 100%), then those products are added up. Shops with 0% share or no stored last review contribute 0."
+          highlight
+        />
+        <NewestReviewTile lastReview={lastReview} />
         <SummaryTile
           icon={MessageSquareIcon}
           label="Reviews"
@@ -713,45 +722,22 @@ function MetricsTotalsPanel({
   )
 }
 
-function WeightedDaysTile({
-  weightedDays,
-  lastReview,
-}: {
-  weightedDays: number | null
-  lastReview: LastReviewItem | null
-}) {
-  const daysLabel = weightedDays == null ? '—' : formatWeightedAverage(weightedDays)
-  const todayLabel = formatLastReviewDate(todayIsoDay())
-
+function NewestReviewTile({ lastReview }: { lastReview: LastReviewItem | null }) {
   return (
-    <div className="col-span-2 rounded-xl bg-amber-400/15 px-3 py-2 ring-1 ring-amber-400/35 lg:col-span-1">
+    <div className="col-span-2 rounded-xl bg-background/70 px-3 py-2 ring-1 ring-foreground/5 lg:col-span-1">
       <div className="flex items-center gap-1.5 text-muted-foreground">
-        <CalendarDaysIcon className="size-3.5 shrink-0" aria-hidden />
-        <p className="min-w-0 flex-1 text-[11px] tracking-wide uppercase">Weighted days since last review</p>
-        <InfoTip label="Weighted days since last review" side="left">
-          Each shop’s whole days from its last review to today is multiplied by its share (as a
-          fraction of 100%), then those products are added up. Shops with 0% share or no stored last
-          review contribute 0. Today is shown on the right. The newest last review is
-          shown below.
+        <MessageSquareIcon className="size-3.5 shrink-0" aria-hidden />
+        <p className="min-w-0 flex-1 text-[11px] tracking-wide uppercase">Newest review</p>
+        <InfoTip label="Newest review" side="left">
+          The most recent last review among all shops, with whole days from that date to today.
         </InfoTip>
       </div>
-      <div className="mt-0.5 flex items-start justify-between gap-3">
-        <div>
-          <p className="font-heading text-lg font-medium tabular-nums">{daysLabel}</p>
-          <p className="text-[11px] text-muted-foreground">SUMPRODUCT(share / 100, days)</p>
-        </div>
-        <div className="text-right">
-          <p className="text-[11px] tracking-wide text-muted-foreground uppercase">Today</p>
-          <p className="text-sm tabular-nums">{todayLabel}</p>
-        </div>
-      </div>
-
       {lastReview ? (
         <Link
           href={reviewsPageHref(lastReview.campaignId)}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-2 block min-w-0 border-t border-amber-400/25 pt-2 hover:bg-background/40"
+          className="mt-1 block min-w-0 hover:bg-background/40"
         >
           <p className="truncate text-sm font-medium">{lastReview.name}</p>
           <p className="text-[11px] text-muted-foreground tabular-nums">
@@ -766,7 +752,7 @@ function WeightedDaysTile({
           )}
         </Link>
       ) : (
-        <p className="mt-2 text-xs text-muted-foreground">No last review stored yet.</p>
+        <p className="mt-1 text-xs text-muted-foreground">No last review stored yet.</p>
       )}
     </div>
   )
