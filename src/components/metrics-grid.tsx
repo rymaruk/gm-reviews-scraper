@@ -175,16 +175,14 @@ export function MetricsGrid({
     [campaigns, initialReviewStats],
   )
   const lastReview = lastReviews[0] ?? null
-  const weightedDays = shareWeightedAverage(
-    campaigns.flatMap((campaign) => {
-      const share = parseShare(drafts[campaign.id] ?? '')
-      const lastReviewAt = initialReviewStats[campaign.id]?.lastReviewAt
-      if (share == null || share <= 0 || !lastReviewAt) return []
-      const days = daysSinceLastReview(lastReviewAt)
-      if (days == null) return []
-      return [{ share, value: Math.max(0, days) }]
-    }),
-  )
+  const weightedDays = campaigns.reduce<number | null>((sum, campaign) => {
+    const share = parseShare(drafts[campaign.id] ?? '')
+    const lastReviewAt = initialReviewStats[campaign.id]?.lastReviewAt
+    if (share == null || share <= 0 || !lastReviewAt) return sum
+    const days = daysSinceLastReview(lastReviewAt)
+    if (days == null) return sum
+    return (sum ?? 0) + (share / SHARE_TOTAL) * Math.max(0, days)
+  }, null)
   const totalReviews = campaigns.reduce(
     (sum, campaign) => sum + (initialReviewStats[campaign.id]?.count ?? 0),
     0,
@@ -668,7 +666,7 @@ function MetricsTotalsPanel({
             Totals
             <InfoTip label="Totals" side="left">
               Live results for every shop. Weighted rating is SUMPRODUCT(share, rating) / SUM(share).
-              Weighted days is SUMPRODUCT(share, days since last review) / SUM(share).
+              Weighted days is SUMPRODUCT(share / 100, days since last review) over all shops.
             </InfoTip>
           </h2>
           <p className="text-[11px] text-muted-foreground">
@@ -731,16 +729,16 @@ function WeightedDaysTile({
         <CalendarDaysIcon className="size-3.5 shrink-0" aria-hidden />
         <p className="min-w-0 flex-1 text-[11px] tracking-wide uppercase">Weighted days since last review</p>
         <InfoTip label="Weighted days since last review" side="left">
-          Each shop’s whole days from its last review to today is multiplied by its share, then
-          those products are added up and divided by the sum of shares. Shops with 0% share or no
-          stored last review are skipped. Today is shown on the right. The newest last review is
+          Each shop’s whole days from its last review to today is multiplied by its share (as a
+          fraction of 100%), then those products are added up. Shops with 0% share or no stored last
+          review contribute 0. Today is shown on the right. The newest last review is
           shown below.
         </InfoTip>
       </div>
       <div className="mt-0.5 flex items-start justify-between gap-3">
         <div>
           <p className="font-heading text-lg font-medium tabular-nums">{daysLabel}</p>
-          <p className="text-[11px] text-muted-foreground">SUMPRODUCT(share, days) / SUM(share)</p>
+          <p className="text-[11px] text-muted-foreground">SUMPRODUCT(share / 100, days)</p>
         </div>
         <div className="text-right">
           <p className="text-[11px] tracking-wide text-muted-foreground uppercase">Today</p>
