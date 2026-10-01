@@ -669,9 +669,6 @@ function MetricsTotalsPanel({
               Weighted days is SUMPRODUCT(share / 100, days since last review) over all shops.
             </InfoTip>
           </h2>
-          <p className="text-[11px] text-muted-foreground">
-            SUMPRODUCT(share, value) / Σ share
-          </p>
         </div>
         {saving ? (
           <Loader2Icon className="mt-0.5 size-4 shrink-0 animate-spin text-muted-foreground" aria-label="Saving shares" />
@@ -706,7 +703,7 @@ function MetricsTotalsPanel({
           hint={`Today ${formatLastReviewDate(todayIsoDay())}`}
           formula="SUMPRODUCT(each share; each diff days)"
           info="Share-weighted days since the last review. For each shop: days since its last review × share. These products are summed. Shops with 0% share or no last review count as 0."
-          highlight
+          highlight="green"
         />
         <NewestReviewTile lastReview={lastReview} />
         <SummaryTile
@@ -777,7 +774,7 @@ function SummaryTile({
   info?: string
   icon: ComponentType<SVGProps<SVGSVGElement>>
   iconClassName?: string
-  highlight?: boolean
+  highlight?: boolean | 'green'
   tone?: 'default' | 'danger'
   className?: string
 }) {
@@ -785,7 +782,11 @@ function SummaryTile({
     <div
       className={cn(
         'rounded-xl px-3 py-2 ring-1',
-        highlight ? 'bg-amber-400/15 ring-amber-400/35' : 'bg-background/70 ring-foreground/5',
+        highlight === 'green'
+          ? 'bg-emerald-400/15 ring-emerald-400/35'
+          : highlight
+            ? 'bg-amber-400/15 ring-amber-400/35'
+            : 'bg-background/70 ring-foreground/5',
         className,
       )}
     >
