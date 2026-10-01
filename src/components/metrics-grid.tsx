@@ -704,8 +704,8 @@ function MetricsTotalsPanel({
           label="Weighted days since last review"
           value={weightedDays != null ? formatWeightedAverage(weightedDays) : '—'}
           hint={`Today ${formatLastReviewDate(todayIsoDay())}`}
-          formula="SUMPRODUCT(share / 100, days)"
-          info="Each shop’s whole days from its last review to today is multiplied by its share (as a fraction of 100%), then those products are added up. Shops with 0% share or no stored last review contribute 0."
+          formula="SUMPRODUCT(each share; each diff days)"
+          info="Share-weighted days since the last review. For each shop: days since its last review × share. These products are summed. Shops with 0% share or no last review count as 0."
           highlight
         />
         <NewestReviewTile lastReview={lastReview} />
